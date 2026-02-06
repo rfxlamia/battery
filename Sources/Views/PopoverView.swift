@@ -64,6 +64,28 @@ struct PopoverView: View {
                         color: UsageLevel.from(utilization: opusUtil).color
                     )
                 }
+
+                // Extra usage (if enabled)
+                if viewModel.extraUsageEnabled {
+                    Divider()
+                    ExtraUsageView(
+                        usedCredits: viewModel.extraUsageCost,
+                        monthlyLimit: viewModel.extraUsageLimit,
+                        utilization: viewModel.extraUsageUtilization
+                    )
+                }
+
+                // Projections (Phase 2)
+                if viewModel.projection != nil {
+                    Divider()
+                    ProjectionView(projection: viewModel.projection)
+                }
+
+                // 7-day chart (Phase 2)
+                if !viewModel.dailyPeaks.isEmpty {
+                    Divider()
+                    StatsView(dailyPeaks: viewModel.dailyPeaks)
+                }
             }
 
             Divider()

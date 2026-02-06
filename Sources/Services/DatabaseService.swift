@@ -57,6 +57,83 @@ actor DatabaseService {
         ))
     }
 
+    func getSnapshots(from startDate: Date, to endDate: Date) throws -> [UsageSnapshot] {
+        guard let db = db else { return [] }
+        let query = snapshots
+            .filter(colTimestamp >= startDate.timeIntervalSince1970 && colTimestamp <= endDate.timeIntervalSince1970)
+            .order(colTimestamp.asc)
+
+        return try db.prepare(query).map { row in
+            UsageSnapshot(
+                id: UUID(uuidString: row[colId]) ?? UUID(),
+                timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
+                sessionUtilization: row[colSessionUtil],
+                sessionResetsAt: Date(timeIntervalSince1970: row[colSessionResets]),
+                weeklyUtilization: row[colWeeklyUtil],
+                weeklyResetsAt: Date(timeIntervalSince1970: row[colWeeklyResets]),
+                sonnetUtilization: row[colSonnetUtil],
+                opusUtilization: row[colOpusUtil],
+                planTier: row[colPlanTier]
+            )
+        }
+    }
+
+    func getLatestSnapshots(count: Int) throws -> [UsageSnapshot] {
+        guard let db = db else { return [] }
+        let query = snapshots
+            .order(colTimestamp.desc)
+            .limit(count)
+
+        return try db.prepare(query).map { row in
+            UsageSnapshot(
+                id: UUID(uuidString: row[colId]) ?? UUID(),
+                timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
+                sessionUtilization: row[colSessionUtil],
+                sessionResetsAt: Date(timeIntervalSince1970: row[colSessionResets]),
+                weeklyUtilization: row[colWeeklyUtil],
+                weeklyResetsAt: Date(timeIntervalSince1970: row[colWeeklyResets]),
+                sonnetUtilization: row[colSonnetUtil],
+                opusUtilization: row[colOpusUtil],
+                planTier: row[colPlanTier]
+            )
+        }.reversed()  // Return in chronological order
+    }
+
+    func getDailyPeaks(days: Int) throws -> [(date: Date, peak: Double)] {
+        guard let db = db else { return [] }
+        let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
+        let query = snapshots
+            .filter(colTimestamp >= cutoff.timeIntervalSince1970)
+            .order(colTimestamp.asc)
+
+        // Group by calendar day and find peak session utilization per day
+        var dailyPeaks: [String: Double] = [:]
+        var dailyDates: [String: Date] = [:]
+        let calendar = Calendar.current
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        for row in try db.prepare(query) {
+            let timestamp = Date(timeIntervalSince1970: row[colTimestamp])
+            let dayKey = dateFormatter.string(from: timestamp)
+            let util = row[colSessionUtil]
+
+            if let existing = dailyPeaks[dayKey] {
+                if util > existing {
+                    dailyPeaks[dayKey] = util
+                }
+            } else {
+                dailyPeaks[dayKey] = util
+                dailyDates[dayKey] = calendar.startOfDay(for: timestamp)
+            }
+        }
+
+        return dailyDates.keys.sorted().compactMap { key in
+            guard let date = dailyDates[key], let peak = dailyPeaks[key] else { return nil }
+            return (date: date, peak: peak)
+        }
+    }
+
     func pruneOldData(olderThan date: Date) throws {
         guard let db = db else { return }
         let old = snapshots.filter(colTimestamp < date.timeIntervalSince1970)

@@ -16,6 +16,15 @@ struct UsageResponse: Codable {
         case sevenDayOpus = "seven_day_opus"
         case extraUsage = "extra_usage"
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        fiveHour = try container.decode(UsageBucket.self, forKey: .fiveHour)
+        sevenDay = try container.decode(UsageBucket.self, forKey: .sevenDay)
+        sevenDaySonnet = try? container.decodeIfPresent(UsageBucket.self, forKey: .sevenDaySonnet)
+        sevenDayOpus = try? container.decodeIfPresent(UsageBucket.self, forKey: .sevenDayOpus)
+        extraUsage = try? container.decodeIfPresent(ExtraUsage.self, forKey: .extraUsage)
+    }
 }
 
 struct UsageBucket: Codable {
@@ -41,11 +50,15 @@ struct UsageBucket: Codable {
 }
 
 struct ExtraUsage: Codable {
-    let enabled: Bool
-    let currentPeriodCostUsd: Double?
+    let isEnabled: Bool
+    let monthlyLimit: Double?
+    let usedCredits: Double?
+    let utilization: Double?
 
     enum CodingKeys: String, CodingKey {
-        case enabled
-        case currentPeriodCostUsd = "current_period_cost_usd"
+        case isEnabled = "is_enabled"
+        case monthlyLimit = "monthly_limit"
+        case usedCredits = "used_credits"
+        case utilization
     }
 }
