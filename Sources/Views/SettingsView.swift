@@ -234,6 +234,7 @@ struct SettingsView: View {
                 set: { viewModel.setLaunchAtLogin($0) }
             ))
             .font(.caption)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
