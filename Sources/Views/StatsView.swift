@@ -6,7 +6,7 @@ struct StatsView: View {
     let dailyPeaks: [(date: Date, peak: Double)]
     let currentStreak: Int
     let activeDays: [Date: Double]
-    let todaySnapshotCount: Int
+    let todaySessionCount: Int
     let todayPeakUtilization: Double
 
     var body: some View {
@@ -38,13 +38,15 @@ struct StatsView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    HStack(spacing: 2) {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 4))
-                            .foregroundStyle(.tertiary)
-                        Text("\(todaySnapshotCount) polls")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                    if todaySessionCount > 0 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 4))
+                                .foregroundStyle(.tertiary)
+                            Text("\(todaySessionCount) sessions")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -124,6 +126,10 @@ private struct HeatMapView: View {
 private struct SparklineChart: View {
     let dailyPeaks: [(date: Date, peak: Double)]
 
+    private func lastPeakLabel(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date) ? "Today" : date.formatted(.dateTime.weekday(.wide))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -134,8 +140,8 @@ private struct SparklineChart: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                if let todayPeak = dailyPeaks.last {
-                    Text("Today: \(Int(todayPeak.peak))%")
+                if let lastPeak = dailyPeaks.last {
+                    Text("\(lastPeakLabel(lastPeak.date)): \(Int(lastPeak.peak))%")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }

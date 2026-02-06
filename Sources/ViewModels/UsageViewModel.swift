@@ -27,7 +27,7 @@ class UsageViewModel: ObservableObject {
     // Phase 3: Streaks and stats
     @Published var currentStreak: Int = 0
     @Published var activeDays: [Date: Double] = [:]  // last 30 days heat map
-    @Published var todaySnapshotCount: Int = 0
+    @Published var todaySessionCount: Int = 0
 
     // Phase 3: Hook-driven session awareness
     @Published var isSessionActive: Bool = false
@@ -39,8 +39,11 @@ class UsageViewModel: ObservableObject {
     private let databaseService = DatabaseService()
     private let notificationService = NotificationService()
     private let hookWatcher = HookFileWatcher()
+    private let statsCacheService = StatsCacheService()
     private var cancellables = Set<AnyCancellable>()
     private var dbInitialized = false
+    private var todayPeakSeen: Double = 0
+    private var todayPeakDate: Date = Calendar.current.startOfDay(for: Date())
 
     // MARK: - Computed Properties
 
@@ -93,11 +96,13 @@ class UsageViewModel: ObservableObject {
         notificationService.requestPermission()
         pollingService.startPolling()
         hookWatcher.startWatching()
+        statsCacheService.startWatching()
     }
 
     deinit {
         pollingService.stopPolling()
         hookWatcher.stopWatching()
+        statsCacheService.stopWatching()
     }
 
     func refresh() {
@@ -113,8 +118,6 @@ class UsageViewModel: ObservableObject {
             do {
                 try await databaseService.initialize()
                 await MainActor.run { dbInitialized = true }
-                // Load historical chart data
-                await loadDailyPeaks()
                 // Prune old data
                 let cutoff = Date().addingTimeInterval(-Double(Constants.dataRetentionDays) * 86400)
                 try await databaseService.pruneOldData(olderThan: cutoff)
@@ -169,6 +172,31 @@ class UsageViewModel: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
+
+        // Stats cache: streak, heatmap, sparkline, session count
+        statsCacheService.$currentStreak
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$currentStreak)
+
+        statsCacheService.$activeDays
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] days in
+                guard let self = self else { return }
+                self.activeDays = self.injectTodayActivity(into: days)
+            }
+            .store(in: &cancellables)
+
+        statsCacheService.$dailyPeaks
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] peaks in
+                guard let self = self else { return }
+                self.dailyPeaks = self.injectTodayPeak(into: peaks)
+            }
+            .store(in: &cancellables)
+
+        statsCacheService.$todaySessionCount
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$todaySessionCount)
     }
 
     private func updateFromUsage(_ usage: UsageResponse) {
@@ -185,6 +213,18 @@ class UsageViewModel: ObservableObject {
         isConnected = true
         lastUpdated = Date()
         error = nil
+
+        // Track today's peak utilization (survives session resets)
+        let today = Calendar.current.startOfDay(for: Date())
+        if today != todayPeakDate {
+            todayPeakSeen = 0
+            todayPeakDate = today
+        }
+        todayPeakSeen = max(todayPeakSeen, sessionUtilization)
+
+        // Ensure today appears in heatmap and sparkline with live data
+        activeDays = injectTodayActivity(into: activeDays)
+        dailyPeaks = injectTodayPeak(into: dailyPeaks)
 
         // Reset notification thresholds when utilization drops
         notificationService.resetThresholds(below: sessionUtilization)
@@ -240,25 +280,26 @@ class UsageViewModel: ObservableObject {
         } catch {
             print("Failed to compute projections: \(error.localizedDescription)")
         }
-
-        // Refresh daily peaks for chart
-        await loadDailyPeaks()
     }
 
-    private func loadDailyPeaks() async {
-        do {
-            let peaks = try await databaseService.getDailyPeaks(days: 7)
-            let streak = try await databaseService.getCurrentStreak()
-            let days = try await databaseService.getActiveDays(days: 30)
-            let snapCount = try await databaseService.getTodaySnapshotCount()
-            await MainActor.run {
-                self.dailyPeaks = peaks
-                self.currentStreak = streak
-                self.activeDays = days
-                self.todaySnapshotCount = snapCount
-            }
-        } catch {
-            print("Failed to load daily peaks: \(error.localizedDescription)")
-        }
+    // MARK: - Today Injection
+
+    /// If stats-cache.json hasn't been updated for today yet, inject the day's
+    /// peak utilization so the heatmap shows today as active.
+    private func injectTodayActivity(into days: [Date: Double]) -> [Date: Double] {
+        let today = Calendar.current.startOfDay(for: Date())
+        guard days[today] == nil, isConnected, todayPeakSeen > 0 else { return days }
+        var merged = days
+        merged[today] = todayPeakSeen
+        return merged
+    }
+
+    /// If stats-cache.json hasn't been updated for today yet, append the day's
+    /// peak utilization so the sparkline includes today.
+    private func injectTodayPeak(into peaks: [(date: Date, peak: Double)]) -> [(date: Date, peak: Double)] {
+        let today = Calendar.current.startOfDay(for: Date())
+        guard !peaks.contains(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) else { return peaks }
+        guard isConnected, todayPeakSeen > 0 else { return peaks }
+        return peaks + [(date: today, peak: todayPeakSeen)]
     }
 }
