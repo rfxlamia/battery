@@ -3,6 +3,7 @@ import SwiftUI
 /// Main popover panel shown when clicking the menu bar icon.
 struct PopoverView: View {
     @ObservedObject var viewModel: UsageViewModel
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -81,10 +82,16 @@ struct PopoverView: View {
                     ProjectionView(projection: viewModel.projection)
                 }
 
-                // 7-day chart (Phase 2)
-                if !viewModel.dailyPeaks.isEmpty {
+                // Stats: streak, heat map, 7-day chart (Phase 2+3)
+                if !viewModel.dailyPeaks.isEmpty || !viewModel.activeDays.isEmpty {
                     Divider()
-                    StatsView(dailyPeaks: viewModel.dailyPeaks)
+                    StatsView(
+                        dailyPeaks: viewModel.dailyPeaks,
+                        currentStreak: viewModel.currentStreak,
+                        activeDays: viewModel.activeDays,
+                        todaySnapshotCount: viewModel.todaySnapshotCount,
+                        todayPeakUtilization: viewModel.dailyPeaks.last?.peak ?? viewModel.sessionUtilization
+                    )
                 }
             }
 
@@ -99,6 +106,12 @@ struct PopoverView: View {
                 }
 
                 Spacer()
+
+                Button(action: { showSettings.toggle() }) {
+                    Image(systemName: "gearshape")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
 
                 Button(action: { viewModel.refresh() }) {
                     Image(systemName: "arrow.clockwise")
@@ -115,5 +128,8 @@ struct PopoverView: View {
             }
         }
         .padding(16)
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
     }
 }

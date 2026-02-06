@@ -24,11 +24,21 @@ class UsageViewModel: ObservableObject {
     @Published var projection: BurnRateProjection?
     @Published var dailyPeaks: [(date: Date, peak: Double)] = []
 
+    // Phase 3: Streaks and stats
+    @Published var currentStreak: Int = 0
+    @Published var activeDays: [Date: Double] = [:]  // last 30 days heat map
+    @Published var todaySnapshotCount: Int = 0
+
+    // Phase 3: Hook-driven session awareness
+    @Published var isSessionActive: Bool = false
+    @Published var currentSessionStart: Date?
+
     // MARK: - Services
 
     private let pollingService = UsagePollingService()
     private let databaseService = DatabaseService()
     private let notificationService = NotificationService()
+    private let hookWatcher = HookFileWatcher()
     private var cancellables = Set<AnyCancellable>()
     private var dbInitialized = false
 
@@ -53,9 +63,22 @@ class UsageViewModel: ObservableObject {
     }
 
     var menuBarText: String {
+        let settings = AppSettings.shared
+        guard settings.showMenuBarText else { return "" }
+
         let pct = Int(sessionUtilization)
         let time = TimeFormatting.shortDuration(sessionTimeRemaining)
-        return "\(pct)% · \(time)"
+
+        switch settings.displayMode {
+        case .percentageAndTime:
+            return "\(pct)% · \(time)"
+        case .percentageOnly:
+            return "\(pct)%"
+        case .timeOnly:
+            return time
+        case .iconOnly:
+            return ""
+        }
     }
 
     var menuBarSymbol: String {
@@ -69,10 +92,12 @@ class UsageViewModel: ObservableObject {
         initializeDatabase()
         notificationService.requestPermission()
         pollingService.startPolling()
+        hookWatcher.startWatching()
     }
 
     deinit {
         pollingService.stopPolling()
+        hookWatcher.stopWatching()
     }
 
     func refresh() {
@@ -115,6 +140,25 @@ class UsageViewModel: ObservableObject {
                 if error != nil {
                     self?.isConnected = false
                 }
+            }
+            .store(in: &cancellables)
+
+        // Hook watcher: adjust polling rate based on session activity
+        hookWatcher.$isSessionActive
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] active in
+                guard let self = self else { return }
+                self.isSessionActive = active
+                let interval = active ? Constants.activePollInterval : Constants.idlePollInterval
+                self.pollingService.setInterval(interval)
+            }
+            .store(in: &cancellables)
+
+        hookWatcher.$currentSessionStart
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] start in
+                self?.currentSessionStart = start
             }
             .store(in: &cancellables)
     }
@@ -196,8 +240,14 @@ class UsageViewModel: ObservableObject {
     private func loadDailyPeaks() async {
         do {
             let peaks = try await databaseService.getDailyPeaks(days: 7)
+            let streak = try await databaseService.getCurrentStreak()
+            let days = try await databaseService.getActiveDays(days: 30)
+            let snapCount = try await databaseService.getTodaySnapshotCount()
             await MainActor.run {
                 self.dailyPeaks = peaks
+                self.currentStreak = streak
+                self.activeDays = days
+                self.todaySnapshotCount = snapCount
             }
         } catch {
             print("Failed to load daily peaks: \(error.localizedDescription)")

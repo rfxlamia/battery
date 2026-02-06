@@ -139,4 +139,79 @@ actor DatabaseService {
         let old = snapshots.filter(colTimestamp < date.timeIntervalSince1970)
         try db.run(old.delete())
     }
+
+    /// Returns a set of dates (start-of-day) that have at least one snapshot, going back `days` days.
+    func getActiveDays(days: Int) throws -> [Date: Double] {
+        guard let db = db else { return [:] }
+        let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
+        let query = snapshots
+            .filter(colTimestamp >= cutoff.timeIntervalSince1970)
+            .order(colTimestamp.asc)
+
+        var dayPeaks: [String: Double] = [:]
+        var dayDates: [String: Date] = [:]
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        for row in try db.prepare(query) {
+            let timestamp = Date(timeIntervalSince1970: row[colTimestamp])
+            let key = formatter.string(from: timestamp)
+            let util = row[colSessionUtil]
+            if let existing = dayPeaks[key] {
+                dayPeaks[key] = max(existing, util)
+            } else {
+                dayPeaks[key] = util
+                dayDates[key] = calendar.startOfDay(for: timestamp)
+            }
+        }
+
+        var result: [Date: Double] = [:]
+        for (key, date) in dayDates {
+            result[date] = dayPeaks[key] ?? 0
+        }
+        return result
+    }
+
+    /// Returns the current usage streak (consecutive days with snapshots ending today).
+    func getCurrentStreak() throws -> Int {
+        let activeDays = try getActiveDays(days: 90)
+        guard !activeDays.isEmpty else { return 0 }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        // Check if today has activity
+        guard activeDays[today] != nil else {
+            // Check if yesterday had activity (streak might still be live if it's early in the day)
+            let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+            guard activeDays[yesterday] != nil else { return 0 }
+            // Count backwards from yesterday
+            return countConsecutiveDays(from: yesterday, activeDays: activeDays, calendar: calendar)
+        }
+
+        return countConsecutiveDays(from: today, activeDays: activeDays, calendar: calendar)
+    }
+
+    private func countConsecutiveDays(from startDay: Date, activeDays: [Date: Double], calendar: Calendar) -> Int {
+        var streak = 0
+        var currentDay = startDay
+        while activeDays[currentDay] != nil {
+            streak += 1
+            guard let prev = calendar.date(byAdding: .day, value: -1, to: currentDay) else { break }
+            currentDay = prev
+        }
+        return streak
+    }
+
+    /// Returns today's snapshot count (approximate session count proxy).
+    func getTodaySnapshotCount() throws -> Int {
+        guard let db = db else { return 0 }
+        let today = Calendar.current.startOfDay(for: Date())
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
+        let query = snapshots.filter(
+            colTimestamp >= today.timeIntervalSince1970 && colTimestamp < tomorrow.timeIntervalSince1970
+        )
+        return try db.scalar(query.count)
+    }
 }

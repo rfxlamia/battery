@@ -11,9 +11,12 @@ struct MenuBarIconView: View {
                 .foregroundStyle(viewModel.sessionColor)
 
             if viewModel.isConnected {
-                Text(viewModel.menuBarText)
-                    .font(.caption)
-                    .monospacedDigit()
+                let text = viewModel.menuBarText
+                if !text.isEmpty {
+                    Text(text)
+                        .font(.caption)
+                        .monospacedDigit()
+                }
             } else {
                 Text("--")
                     .font(.caption)
