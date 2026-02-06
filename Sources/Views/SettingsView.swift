@@ -119,7 +119,7 @@ struct SettingsView: View {
                     }
                     .font(.caption)
                     .buttonStyle(.plain)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.accentColor)
                 }
             }
 
@@ -137,7 +137,7 @@ struct SettingsView: View {
                 }
                 .font(.caption)
                 .buttonStyle(.plain)
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.accentColor)
             }
         }
     }
@@ -211,7 +211,7 @@ struct SettingsView: View {
                 }
                 .font(.caption)
                 .buttonStyle(.plain)
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.accentColor)
 
                 Spacer()
 
@@ -220,7 +220,7 @@ struct SettingsView: View {
                 }
                 .font(.caption)
                 .buttonStyle(.plain)
-                .foregroundStyle(.red)
+                .foregroundStyle(Color(red: 1.0, green: 0.23, blue: 0.19))
             }
         }
     }
