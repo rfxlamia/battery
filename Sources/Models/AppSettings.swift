@@ -27,8 +27,11 @@ class AppSettings: ObservableObject {
     @AppStorage("notifyAt95") var notifyAt95: Bool = true
 
     // Display
+    @AppStorage("showMenuBarIcon") var showMenuBarIcon: Bool = true
     @AppStorage("showMenuBarText") var showMenuBarText: Bool = true
     @AppStorage("menuBarDisplayMode") var menuBarDisplayMode: String = MenuBarDisplayMode.percentageAndTime.rawValue
+    @AppStorage("showPercentageRemaining") var showPercentageRemaining: Bool = false
+    @AppStorage("showTimeSinceReset") var showTimeSinceReset: Bool = false
 
     // Polling
     @AppStorage("pollIntervalActive") var pollIntervalActive: Double = 30

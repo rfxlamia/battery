@@ -69,8 +69,18 @@ class UsageViewModel: ObservableObject {
         let settings = AppSettings.shared
         guard settings.showMenuBarText else { return "" }
 
-        let pct = Int(sessionUtilization)
-        let time = TimeFormatting.shortDuration(sessionTimeRemaining)
+        let pct = settings.showPercentageRemaining
+            ? Int(max(0, 100 - sessionUtilization))
+            : Int(sessionUtilization)
+
+        let time: String
+        if settings.showTimeSinceReset, let resetsAt = sessionResetsAt {
+            // 5-hour window: time since reset = 5h - time remaining
+            let elapsed = 18000 - max(0, resetsAt.timeIntervalSinceNow)
+            time = TimeFormatting.shortDuration(max(0, elapsed))
+        } else {
+            time = TimeFormatting.shortDuration(sessionTimeRemaining)
+        }
 
         switch settings.displayMode {
         case .percentageAndTime:

@@ -6,9 +6,11 @@ struct MenuBarIconView: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: viewModel.menuBarSymbol)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(viewModel.sessionColor)
+            if AppSettings.shared.showMenuBarIcon {
+                Image(systemName: viewModel.menuBarSymbol)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(viewModel.sessionColor)
+            }
 
             if viewModel.isConnected {
                 let text = viewModel.menuBarText

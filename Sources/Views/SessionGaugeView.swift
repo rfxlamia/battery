@@ -7,6 +7,14 @@ struct SessionGaugeView: View {
     let resetsAt: Date?
     let color: Color
 
+    private var settings: AppSettings { .shared }
+
+    private var displayPercentage: Int {
+        settings.showPercentageRemaining
+            ? Int(max(0, 100 - utilization))
+            : Int(utilization)
+    }
+
     var body: some View {
         HStack(spacing: 16) {
             // Circular gauge
@@ -21,14 +29,19 @@ struct SessionGaugeView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text("\(Int(utilization))%")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(color)
-                    .monospacedDigit()
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("\(displayPercentage)%")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(color)
+                        .monospacedDigit()
+                    Text(settings.showPercentageRemaining ? "left" : "used")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
 
                 if let resetsAt = resetsAt {
-                    CountdownLabel(targetDate: resetsAt)
+                    CountdownLabel(targetDate: resetsAt, mode: settings.showTimeSinceReset ? .elapsed : .remaining)
                 }
             }
 

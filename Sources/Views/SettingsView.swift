@@ -44,16 +44,20 @@ struct SettingsView: View {
 
     private var displaySection: some View {
         SettingsSection(title: "Display", icon: "eye") {
-            Toggle("Show text in menu bar", isOn: $settings.showMenuBarText)
-                .font(.caption)
+            // Menu bar appearance
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Menu Bar")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
 
-            if settings.showMenuBarText {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Format")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                Toggle("Show icon", isOn: $settings.showMenuBarIcon)
+                    .font(.caption)
 
-                    Picker("", selection: Binding(
+                Toggle("Show text", isOn: $settings.showMenuBarText)
+                    .font(.caption)
+
+                if settings.showMenuBarText {
+                    Picker("Format", selection: Binding(
                         get: { settings.displayMode },
                         set: { settings.displayMode = $0 }
                     )) {
@@ -62,7 +66,36 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .labelsHidden()
+                    .font(.caption)
+                }
+            }
+
+            Divider()
+
+            // Value display preferences
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Values")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Toggle(isOn: $settings.showPercentageRemaining) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Show remaining percentage")
+                            .font(.caption)
+                        Text(settings.showPercentageRemaining ? "e.g. 51% left" : "e.g. 49% used")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                Toggle(isOn: $settings.showTimeSinceReset) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Show time elapsed")
+                            .font(.caption)
+                        Text(settings.showTimeSinceReset ? "e.g. Started 3h 37m ago" : "e.g. Resets in 1h 23m")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
         }
