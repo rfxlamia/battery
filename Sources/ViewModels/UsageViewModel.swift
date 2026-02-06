@@ -161,6 +161,14 @@ class UsageViewModel: ObservableObject {
                 self?.currentSessionStart = start
             }
             .store(in: &cancellables)
+
+        // Forward settings changes so menu bar icon updates immediately
+        AppSettings.shared.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateFromUsage(_ usage: UsageResponse) {
