@@ -7,7 +7,6 @@ struct StatsView: View {
     let currentStreak: Int
     let activeDays: [Date: Double]
     let todaySessionCount: Int
-    let todayPeakUtilization: Double
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -27,16 +26,10 @@ struct StatsView: View {
 
                 Spacer()
 
-                // Today's stats
                 HStack(spacing: 8) {
-                    HStack(spacing: 2) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.tertiary)
-                        Text("\(Int(todayPeakUtilization))%")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text("Last 30 Days")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
 
                     if todaySessionCount > 0 {
                         HStack(spacing: 2) {
@@ -71,32 +64,48 @@ private struct HeatMapView: View {
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
     private let calendar = Calendar.current
+    private let weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"]
 
-    /// Last 35 days arranged in rows of 7 (weeks), most recent at bottom-right.
-    private var dayGrid: [Date] {
+    /// 5 rows × 7 columns, weeks starting on Monday. Future days are nil.
+    private var dayGrid: [Date?] {
         let today = calendar.startOfDay(for: Date())
-        // Go back to fill complete weeks (5 rows x 7 cols = 35 days)
-        return (0..<35).reversed().compactMap { offset in
-            calendar.date(byAdding: .day, value: -offset, to: today)
+        let weekday = calendar.component(.weekday, from: today)
+        // weekday: Sun=1 Mon=2 ... Sat=7 → offset from Monday: Mon=0 Tue=1 ... Sun=6
+        let daysSinceMonday = (weekday + 5) % 7
+        let thisMonday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today)!
+        let gridStart = calendar.date(byAdding: .day, value: -28, to: thisMonday)!
+
+        return (0..<35).map { offset in
+            let date = calendar.date(byAdding: .day, value: offset, to: gridStart)!
+            return date <= today ? date : nil
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text("Last 30 Days")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                Spacer()
+            // Weekday labels
+            LazyVGrid(columns: columns, spacing: 2) {
+                ForEach(weekdayLabels.indices, id: \.self) { i in
+                    Text(weekdayLabels[i])
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.quaternary)
+                        .frame(maxWidth: .infinity)
+                }
             }
 
             LazyVGrid(columns: columns, spacing: 2) {
-                ForEach(dayGrid, id: \.self) { day in
-                    let peak = activeDays[calendar.startOfDay(for: day)]
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(heatColor(for: peak))
-                        .frame(height: 10)
-                        .help(dayTooltip(day: day, peak: peak))
+                ForEach(dayGrid.indices, id: \.self) { i in
+                    if let day = dayGrid[i] {
+                        let peak = activeDays[calendar.startOfDay(for: day)]
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(heatColor(for: peak))
+                            .frame(height: 10)
+                            .help(dayTooltip(day: day, peak: peak))
+                    } else {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(.clear)
+                            .frame(height: 10)
+                    }
                 }
             }
         }
@@ -130,6 +139,27 @@ private struct SparklineChart: View {
         Calendar.current.isDateInToday(date) ? "Today" : date.formatted(.dateTime.weekday(.wide))
     }
 
+    private func peakColor(for value: Double) -> Color {
+        if value >= 75 { return .red }
+        if value >= 50 { return .orange }
+        if value >= 25 { return .yellow }
+        return .green
+    }
+
+    /// Gradient matching heatmap colors: green (bottom) → yellow → orange → red (top)
+    private var heatGradient: LinearGradient {
+        .linearGradient(
+            stops: [
+                .init(color: .green.opacity(0.4), location: 0),
+                .init(color: .yellow.opacity(0.5), location: 0.25),
+                .init(color: .orange.opacity(0.6), location: 0.5),
+                .init(color: .red.opacity(0.7), location: 0.75),
+            ],
+            startPoint: .bottom,
+            endPoint: .top
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -154,9 +184,15 @@ private struct SparklineChart: View {
                 )
                 .foregroundStyle(
                     .linearGradient(
-                        colors: [.blue.opacity(0.3), .blue.opacity(0.05)],
-                        startPoint: .top,
-                        endPoint: .bottom
+                        stops: [
+                            .init(color: .green.opacity(0.05), location: 0),
+                            .init(color: .green.opacity(0.15), location: 0.25),
+                            .init(color: .yellow.opacity(0.2), location: 0.5),
+                            .init(color: .orange.opacity(0.25), location: 0.75),
+                            .init(color: .red.opacity(0.3), location: 1.0),
+                        ],
+                        startPoint: .bottom,
+                        endPoint: .top
                     )
                 )
 
@@ -164,7 +200,7 @@ private struct SparklineChart: View {
                     x: .value("Day", item.date, unit: .day),
                     y: .value("Peak", item.peak)
                 )
-                .foregroundStyle(.blue)
+                .foregroundStyle(heatGradient)
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
 
                 if item.date == dailyPeaks.last?.date {
@@ -172,7 +208,7 @@ private struct SparklineChart: View {
                         x: .value("Day", item.date, unit: .day),
                         y: .value("Peak", item.peak)
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(peakColor(for: item.peak))
                     .symbolSize(20)
                 }
             }
@@ -194,7 +230,7 @@ private struct SparklineChart: View {
                 AxisMarks(values: .stride(by: .day)) { _ in
                     AxisValueLabel(format: .dateTime.weekday(.abbreviated))
                         .font(.system(size: 8))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.secondary.opacity(0.5))
                 }
             }
             .frame(height: 60)

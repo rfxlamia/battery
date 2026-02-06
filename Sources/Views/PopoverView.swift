@@ -97,8 +97,7 @@ struct PopoverView: View {
                         dailyPeaks: viewModel.dailyPeaks,
                         currentStreak: viewModel.currentStreak,
                         activeDays: viewModel.activeDays,
-                        todaySessionCount: viewModel.todaySessionCount,
-                        todayPeakUtilization: viewModel.sessionUtilization
+                        todaySessionCount: viewModel.todaySessionCount
                     )
                 }
             }
