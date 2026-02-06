@@ -4,7 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject var settings = AppSettings.shared
-    @Environment(\.dismiss) private var dismiss
+    var onClose: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -13,7 +13,7 @@ struct SettingsView: View {
                 Text("Settings")
                     .font(.headline)
                 Spacer()
-                Button(action: { dismiss() }) {
+                Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 }

@@ -6,6 +6,14 @@ struct PopoverView: View {
     @State private var showSettings = false
 
     var body: some View {
+        if showSettings {
+            SettingsView(onClose: { showSettings = false })
+        } else {
+            mainContent
+        }
+    }
+
+    private var mainContent: some View {
         VStack(spacing: 16) {
             // Header
             HStack {
@@ -107,7 +115,7 @@ struct PopoverView: View {
 
                 Spacer()
 
-                Button(action: { showSettings.toggle() }) {
+                Button(action: { showSettings = true }) {
                     Image(systemName: "gearshape")
                         .font(.caption)
                 }
@@ -128,8 +136,5 @@ struct PopoverView: View {
             }
         }
         .padding(16)
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-        }
     }
 }
