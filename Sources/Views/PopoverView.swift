@@ -1,0 +1,97 @@
+import SwiftUI
+
+/// Main popover panel shown when clicking the menu bar icon.
+struct PopoverView: View {
+    @ObservedObject var viewModel: UsageViewModel
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // Header
+            HStack {
+                Text("Battery")
+                    .font(.headline)
+                Spacer()
+                if let tier = Optional(viewModel.planTier), tier != .unknown {
+                    Text(tier.displayName)
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(.quaternary)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.bottom, 4)
+
+            if let error = viewModel.error {
+                // Error state
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.title2)
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else {
+                // Session gauge (5-hour)
+                SessionGaugeView(
+                    title: "Session (5-hour)",
+                    utilization: viewModel.sessionUtilization,
+                    resetsAt: viewModel.sessionResetsAt,
+                    color: viewModel.sessionColor
+                )
+
+                Divider()
+
+                // Weekly gauge (7-day)
+                WeeklyGaugeView(
+                    title: "Weekly (7-day)",
+                    utilization: viewModel.weeklyUtilization,
+                    resetsAt: viewModel.weeklyResetsAt,
+                    color: viewModel.weeklyColor
+                )
+
+                // Opus gauge (if applicable)
+                if let opusUtil = viewModel.opusUtilization {
+                    Divider()
+                    WeeklyGaugeView(
+                        title: "Opus (7-day)",
+                        utilization: opusUtil,
+                        resetsAt: viewModel.weeklyResetsAt,
+                        color: UsageLevel.from(utilization: opusUtil).color
+                    )
+                }
+            }
+
+            Divider()
+
+            // Footer
+            HStack {
+                if let lastUpdated = viewModel.lastUpdated {
+                    Text("Updated \(TimeFormatting.relativeTime(lastUpdated))")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer()
+
+                Button(action: { viewModel.refresh() }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: { NSApplication.shared.terminate(nil) }) {
+                    Text("Quit")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+    }
+}
