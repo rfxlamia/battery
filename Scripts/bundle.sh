@@ -92,10 +92,10 @@ if [[ -n "$SPARKLE_FRAMEWORK" ]]; then
         "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
 fi
 
-# Copy compiled asset catalog if it exists
-ASSET_CAR="$PROJECT_DIR/.build/$CONFIG/Battery_Battery.bundle/Contents/Resources/Assets.car"
-if [[ -f "$ASSET_CAR" ]]; then
-    cp "$ASSET_CAR" "$APP_BUNDLE/Contents/Resources/Assets.car"
+# Copy app icon
+if [[ -f "$PROJECT_DIR/Resources/AppIcon.icns" ]]; then
+    cp "$PROJECT_DIR/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+    echo "    Copied AppIcon.icns"
 fi
 
 # Sign the app

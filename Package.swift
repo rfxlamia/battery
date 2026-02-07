@@ -18,9 +18,6 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources",
-            resources: [
-                .copy("../Resources/Assets.xcassets"),
-            ],
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"]),
             ]
