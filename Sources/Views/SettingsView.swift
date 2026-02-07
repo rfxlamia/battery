@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject var settings = AppSettings.shared
+    @ObservedObject var updaterService: UpdaterService
     var onClose: () -> Void
 
     var body: some View {
@@ -255,6 +256,17 @@ struct SettingsView: View {
             Text("Claude Code usage monitor for your menu bar.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+
+            HStack {
+                Spacer()
+                Button("Check for Updates") {
+                    updaterService.checkForUpdates()
+                }
+                .font(.caption)
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .disabled(!updaterService.canCheckForUpdates)
+            }
         }
     }
 }

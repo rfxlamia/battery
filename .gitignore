@@ -21,6 +21,11 @@ DerivedData/
 # Claude Code
 .claude/
 
+# Release artifacts
+*.dmg
+*.zip
+appcast_item.xml
+
 # Battery app data (never commit user data)
 *.db
 events.jsonl

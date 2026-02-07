@@ -3,11 +3,12 @@ import SwiftUI
 /// Main popover panel shown when clicking the menu bar icon.
 struct PopoverView: View {
     @ObservedObject var viewModel: UsageViewModel
+    @ObservedObject var updaterService: UpdaterService
     @State private var showSettings = false
 
     var body: some View {
         if showSettings {
-            SettingsView(onClose: { showSettings = false })
+            SettingsView(updaterService: updaterService, onClose: { showSettings = false })
         } else {
             mainContent
         }
@@ -125,6 +126,14 @@ struct PopoverView: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+
+                Button(action: { updaterService.checkForUpdates() }) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .disabled(!updaterService.canCheckForUpdates)
+                .help("Check for Updates")
 
                 Button(action: { NSApplication.shared.terminate(nil) }) {
                     Text("Quit")
