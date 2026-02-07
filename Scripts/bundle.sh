@@ -54,8 +54,9 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 mkdir -p "$APP_BUNDLE/Contents/Frameworks"
 
-# Copy binary
+# Copy binary and fix rpaths for app bundle
 cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP_BUNDLE/Contents/MacOS/$APP_NAME" 2>/dev/null || true
 
 # Copy Info.plist
 cp "$PROJECT_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
@@ -71,18 +72,10 @@ if [[ -n "${BUILD_NUMBER:-}" ]]; then
 fi
 
 # Copy Sparkle.framework if it exists in the build artifacts
-SPARKLE_FRAMEWORK=""
-for candidate in \
-    "$PROJECT_DIR/.build/artifacts/sparkle-project/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" \
-    "$PROJECT_DIR/.build/artifacts/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"; do
-    if [[ -d "$candidate" ]]; then
-        SPARKLE_FRAMEWORK="$candidate"
-        break
-    fi
-done
+SPARKLE_FRAMEWORK="$(find "$PROJECT_DIR/.build/artifacts" -path "*/macos-arm64_x86_64/Sparkle.framework" -type d 2>/dev/null | head -1)"
 
 if [[ -n "$SPARKLE_FRAMEWORK" ]]; then
-    echo "    Copying Sparkle.framework..."
+    echo "    Copying Sparkle.framework from: $SPARKLE_FRAMEWORK"
     cp -R "$SPARKLE_FRAMEWORK" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
 
     # Deep-sign the framework
@@ -90,6 +83,8 @@ if [[ -n "$SPARKLE_FRAMEWORK" ]]; then
         --options runtime --timestamp \
         --deep \
         "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+else
+    echo "    WARNING: Sparkle.framework not found in build artifacts!"
 fi
 
 # Copy app icon
