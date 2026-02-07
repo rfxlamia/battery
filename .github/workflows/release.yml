@@ -141,23 +141,6 @@ jobs:
           PUB_DATE="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
           DMG_URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/$DMG"
 
-          ITEM=$(cat <<EOF
-              <item>
-                  <title>Version $VERSION</title>
-                  <pubDate>$PUB_DATE</pubDate>
-                  <sparkle:version>$BUILD</sparkle:version>
-                  <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
-                  <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-                  <enclosure
-                      url="$DMG_URL"
-                      length="$SIZE"
-                      type="application/octet-stream"
-                      sparkle:edSignature="$SIGNATURE"
-                  />
-              </item>
-          EOF
-          )
-
           # Clone gh-pages, update appcast, push
           git clone --branch gh-pages --single-branch \
             "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" \
@@ -165,8 +148,29 @@ jobs:
 
           cd gh-pages-dir
 
-          # Insert new item before </channel>
-          sed -i '' "s|</channel>|${ITEM}\n    </channel>|" appcast.xml
+          # Write new item to a temp file, then use python to insert before </channel>
+          cat > /tmp/appcast_item.xml <<XMLEOF
+        <item>
+            <title>Version $VERSION</title>
+            <pubDate>$PUB_DATE</pubDate>
+            <sparkle:version>$BUILD</sparkle:version>
+            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="$DMG_URL"
+                length="$SIZE"
+                type="application/octet-stream"
+                sparkle:edSignature="$SIGNATURE"
+            />
+        </item>
+          XMLEOF
+
+          python3 -c "
+          item = open('/tmp/appcast_item.xml').read()
+          appcast = open('appcast.xml').read()
+          appcast = appcast.replace('</channel>', item + '    </channel>')
+          open('appcast.xml', 'w').write(appcast)
+          "
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
