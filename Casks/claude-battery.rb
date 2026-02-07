@@ -8,7 +8,7 @@ cask "claude-battery" do
   homepage "https://github.com/allthingsclaude/battery"
 
   app "Battery.app"
-  binary "#{appdir}/Battery.app/Contents/MacOS/Battery", target: "claude-battery"
+  binary "#{appdir}/Battery.app/Contents/Resources/claude-battery"
 
   zap trash: [
     "~/Library/Preferences/com.allthingsclaude.battery.plist",

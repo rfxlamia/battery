@@ -93,6 +93,10 @@ if [[ -f "$PROJECT_DIR/Resources/AppIcon.icns" ]]; then
     echo "    Copied AppIcon.icns"
 fi
 
+# Copy CLI launcher
+cp "$PROJECT_DIR/Scripts/claude-battery" "$APP_BUNDLE/Contents/Resources/claude-battery"
+chmod +x "$APP_BUNDLE/Contents/Resources/claude-battery"
+
 # Sign the app
 if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
     # Ad-hoc signing for development
