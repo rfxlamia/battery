@@ -23,7 +23,10 @@ Battery lives in your menu bar and shows how much of your Claude Code rate limit
 
 ```bash
 brew tap allthingsclaude/battery https://github.com/allthingsclaude/battery.git
-brew install --cask battery
+brew install --cask claude-battery
+
+# Launch
+claude-battery
 ```
 
 ### Manual
