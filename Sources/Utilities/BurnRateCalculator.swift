@@ -99,7 +99,7 @@ enum BurnRateCalculator {
 
         // Project when 100% will be hit
         var projectedLimitTime: Date? = nil
-        if slope > 0 && currentUtilization < 100 {
+        if slope > 0.01 && currentUtilization < 100 {
             let hoursToLimit = (100.0 - currentUtilization) / slope
             projectedLimitTime = Date().addingTimeInterval(hoursToLimit * 3600)
         }
