@@ -148,29 +148,28 @@ jobs:
 
           cd gh-pages-dir
 
-          # Write new item to a temp file, then use python to insert before </channel>
-          cat > /tmp/appcast_item.xml <<XMLEOF
-        <item>
-            <title>Version $VERSION</title>
-            <pubDate>$PUB_DATE</pubDate>
-            <sparkle:version>$BUILD</sparkle:version>
-            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <enclosure
-                url="$DMG_URL"
-                length="$SIZE"
-                type="application/octet-stream"
-                sparkle:edSignature="$SIGNATURE"
-            />
-        </item>
-          XMLEOF
+          # Insert new item before </channel>
+          ITEM="        <item>\n"
+          ITEM+="            <title>Version $VERSION</title>\n"
+          ITEM+="            <pubDate>$PUB_DATE</pubDate>\n"
+          ITEM+="            <sparkle:version>$BUILD</sparkle:version>\n"
+          ITEM+="            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>\n"
+          ITEM+="            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>\n"
+          ITEM+="            <enclosure\n"
+          ITEM+="                url=\"$DMG_URL\"\n"
+          ITEM+="                length=\"$SIZE\"\n"
+          ITEM+="                type=\"application/octet-stream\"\n"
+          ITEM+="                sparkle:edSignature=\"$SIGNATURE\"\n"
+          ITEM+="            />\n"
+          ITEM+="        </item>\n"
 
           python3 -c "
-          item = open('/tmp/appcast_item.xml').read()
+          import sys
+          item = sys.argv[1]
           appcast = open('appcast.xml').read()
           appcast = appcast.replace('</channel>', item + '    </channel>')
           open('appcast.xml', 'w').write(appcast)
-          "
+          " "$(echo -e "$ITEM")"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -195,28 +194,28 @@ jobs:
 
           cd cask-update-dir
 
-          cat > Casks/battery.rb <<'CASK'
-          cask "battery" do
-            version "VERSION_PLACEHOLDER"
-            sha256 "SHA256_PLACEHOLDER"
+          python3 -c "
+          import sys
+          v, s, u = sys.argv[1], sys.argv[2], sys.argv[3]
+          cask = f'''cask \"battery\" do
+            version \"{v}\"
+            sha256 \"{s}\"
 
-            url "URL_PLACEHOLDER"
-            name "Battery"
-            desc "Claude Code usage monitor for your menu bar"
-            homepage "https://github.com/allthingsclaude/battery"
+            url \"{u}\"
+            name \"Battery\"
+            desc \"Claude Code usage monitor for your menu bar\"
+            homepage \"https://github.com/allthingsclaude/battery\"
 
-            app "Battery.app"
+            app \"Battery.app\"
 
             zap trash: [
-              "~/Library/Preferences/com.allthingsclaude.battery.plist",
-              "~/.battery",
+              \"~/Library/Preferences/com.allthingsclaude.battery.plist\",
+              \"~/.battery\",
             ]
           end
-          CASK
-
-          sed -i '' "s|VERSION_PLACEHOLDER|$VERSION|" Casks/battery.rb
-          sed -i '' "s|SHA256_PLACEHOLDER|$SHA256|" Casks/battery.rb
-          sed -i '' "s|URL_PLACEHOLDER|$DMG_URL|" Casks/battery.rb
+          '''
+          open('Casks/battery.rb', 'w').write(cask)
+          " "$VERSION" "$SHA256" "$DMG_URL"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
