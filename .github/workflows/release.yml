@@ -1,0 +1,227 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  APP_NAME: Battery
+
+jobs:
+  release:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── Extract version from tag ──────────────────────────────────────
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          echo "tag=v$TAG" >> "$GITHUB_OUTPUT"
+          # Build number = total commit count
+          BUILD=$(git rev-list --count HEAD)
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "Version: $TAG (build $BUILD)"
+
+      # ── Set up signing keychain ───────────────────────────────────────
+      - name: Set up keychain
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERTIFICATE_PWD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+      # ── Build universal binary ────────────────────────────────────────
+      - name: Build universal binary
+        run: |
+          swift build -c release --arch arm64 --arch x86_64
+
+      # ── Run tests ─────────────────────────────────────────────────────
+      - name: Test
+        run: swift test
+
+      # ── Bundle .app ───────────────────────────────────────────────────
+      - name: Bundle app
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.MACOS_CERTIFICATE_NAME }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+        run: |
+          bash Scripts/bundle.sh release
+
+      # ── Notarize .app ─────────────────────────────────────────────────
+      - name: Notarize app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          bash Scripts/notarize.sh "$APP_NAME.app"
+
+      # ── Create DMG ────────────────────────────────────────────────────
+      - name: Create DMG
+        run: |
+          bash Scripts/create-dmg.sh "$APP_NAME.app" "$APP_NAME-${{ steps.version.outputs.version }}.dmg"
+
+      # ── Sign + notarize DMG ───────────────────────────────────────────
+      - name: Sign and notarize DMG
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.MACOS_CERTIFICATE_NAME }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          DMG="$APP_NAME-${{ steps.version.outputs.version }}.dmg"
+          codesign --force --sign "$CODESIGN_IDENTITY" --timestamp "$DMG"
+          bash Scripts/notarize.sh "$DMG"
+
+      # ── Sign with Sparkle EdDSA key ───────────────────────────────────
+      - name: Sparkle EdDSA signature
+        id: sparkle
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          DMG="$APP_NAME-${{ steps.version.outputs.version }}.dmg"
+          SIZE=$(stat -f%z "$DMG")
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+
+          # Find sign_update in Sparkle build artifacts
+          SIGN_UPDATE=$(find .build -name "sign_update" -type f 2>/dev/null | head -1)
+          if [[ -z "$SIGN_UPDATE" ]]; then
+            echo "Warning: sign_update not found, downloading from Sparkle release..."
+            curl -sL "https://github.com/sparkle-project/Sparkle/releases/latest/download/Sparkle-2.6.4.tar.xz" \
+              | tar xJ --include="*/bin/sign_update" -C "$RUNNER_TEMP"
+            SIGN_UPDATE="$RUNNER_TEMP/bin/sign_update"
+            chmod +x "$SIGN_UPDATE"
+          fi
+
+          SIGNATURE=$("$SIGN_UPDATE" "$DMG" --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") | grep "sparkle:edSignature" | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')
+          echo "signature=$SIGNATURE" >> "$GITHUB_OUTPUT"
+
+      # ── Create GitHub Release ─────────────────────────────────────────
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DMG="$APP_NAME-${{ steps.version.outputs.version }}.dmg"
+          gh release create "${{ steps.version.outputs.tag }}" "$DMG" \
+            --title "$APP_NAME ${{ steps.version.outputs.version }}" \
+            --generate-notes
+
+      # ── Update appcast.xml on gh-pages ────────────────────────────────
+      - name: Update appcast
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD="${{ steps.version.outputs.build }}"
+          DMG="$APP_NAME-$VERSION.dmg"
+          SIZE="${{ steps.sparkle.outputs.size }}"
+          SIGNATURE="${{ steps.sparkle.outputs.signature }}"
+          PUB_DATE="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
+          DMG_URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/$DMG"
+
+          ITEM=$(cat <<EOF
+              <item>
+                  <title>Version $VERSION</title>
+                  <pubDate>$PUB_DATE</pubDate>
+                  <sparkle:version>$BUILD</sparkle:version>
+                  <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+                  <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+                  <enclosure
+                      url="$DMG_URL"
+                      length="$SIZE"
+                      type="application/octet-stream"
+                      sparkle:edSignature="$SIGNATURE"
+                  />
+              </item>
+          EOF
+          )
+
+          # Clone gh-pages, update appcast, push
+          git clone --branch gh-pages --single-branch \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" \
+            gh-pages-dir
+
+          cd gh-pages-dir
+
+          # Insert new item before </channel>
+          sed -i '' "s|</channel>|${ITEM}\n    </channel>|" appcast.xml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "Update appcast for v$VERSION"
+          git push
+
+      # ── Update Homebrew cask (in-repo) ──────────────────────────────────
+      - name: Update Homebrew cask
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG="$APP_NAME-$VERSION.dmg"
+          SHA256=$(shasum -a 256 "$DMG" | awk '{print $1}')
+          DMG_URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/$DMG"
+
+          # Update cask formula on main branch
+          git clone --branch main --single-branch \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" \
+            cask-update-dir
+
+          cd cask-update-dir
+
+          cat > Casks/battery.rb <<'CASK'
+          cask "battery" do
+            version "VERSION_PLACEHOLDER"
+            sha256 "SHA256_PLACEHOLDER"
+
+            url "URL_PLACEHOLDER"
+            name "Battery"
+            desc "Claude Code usage monitor for your menu bar"
+            homepage "https://github.com/allthingsclaude/battery"
+
+            app "Battery.app"
+
+            zap trash: [
+              "~/Library/Preferences/com.allthingsclaude.battery.plist",
+              "~/.battery",
+            ]
+          end
+          CASK
+
+          sed -i '' "s|VERSION_PLACEHOLDER|$VERSION|" Casks/battery.rb
+          sed -i '' "s|SHA256_PLACEHOLDER|$SHA256|" Casks/battery.rb
+          sed -i '' "s|URL_PLACEHOLDER|$DMG_URL|" Casks/battery.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/battery.rb
+          git commit -m "Update cask to v$VERSION"
+          git push
+
+      # ── Cleanup keychain ──────────────────────────────────────────────
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
