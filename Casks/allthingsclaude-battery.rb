@@ -1,4 +1,4 @@
-cask "battery" do
+cask "allthingsclaude-battery" do
   version "0.1.0"
   sha256 "db9706c037281dd998ac591dc1233533509a17f94b314f2a5de778c6ca9c0aab"
 

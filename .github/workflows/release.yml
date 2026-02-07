@@ -197,7 +197,7 @@ jobs:
           python3 -c "
           import sys
           v, s, u = sys.argv[1], sys.argv[2], sys.argv[3]
-          cask = f'''cask \"battery\" do
+          cask = f'''cask \"allthingsclaude-battery\" do
             version \"{v}\"
             sha256 \"{s}\"
 
@@ -214,12 +214,12 @@ jobs:
             ]
           end
           '''
-          open('Casks/battery.rb', 'w').write(cask)
+          open('Casks/allthingsclaude-battery.rb', 'w').write(cask)
           " "$VERSION" "$SHA256" "$DMG_URL"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/battery.rb
+          git add Casks/allthingsclaude-battery.rb
           git commit -m "Update cask to v$VERSION"
           git push
 
