@@ -1,4 +1,3 @@
 #!/bin/bash
-APP_DIR="$(dirname "$(dirname "$(readlink -f "$0")")")"
-open "$APP_DIR"
+open -a Battery
 echo "Claude Battery is running in your menu bar."
