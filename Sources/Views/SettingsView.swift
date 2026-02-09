@@ -37,12 +37,9 @@ struct SettingsView: View {
                 }
                 .padding(16)
             }
-            .frame(height: min(
-                (NSScreen.main?.visibleFrame.height ?? 800) * 0.9 - 50,
-                900
-            ))
         }
         .frame(width: 320)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: - Display
