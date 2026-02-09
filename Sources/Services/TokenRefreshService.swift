@@ -34,12 +34,23 @@ actor TokenRefreshService {
     private let refreshBufferSeconds: TimeInterval = 300 // 5 minutes
 
     /// Returns a valid access token, refreshing if needed.
-    func refreshIfNeeded(credentials: KeychainService.Credentials) async throws -> String {
+    /// When a refresh occurs, the updated credentials are persisted via `keychainService`.
+    func refreshIfNeeded(
+        credentials: KeychainService.Credentials,
+        keychainService: KeychainService
+    ) async throws -> String {
         if credentials.expiresAt.timeIntervalSinceNow > refreshBufferSeconds {
             return credentials.accessToken
         }
         let response = try await forceRefresh(refreshToken: credentials.refreshToken)
-        // TODO: Update Keychain with new tokens
+        let updated = KeychainService.Credentials(
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken ?? credentials.refreshToken,
+            expiresAt: Date().addingTimeInterval(TimeInterval(response.expiresIn)),
+            subscriptionType: credentials.subscriptionType,
+            rateLimitTier: credentials.rateLimitTier
+        )
+        await keychainService.updateCachedCredentials(updated)
         return response.accessToken
     }
 

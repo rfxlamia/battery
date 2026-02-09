@@ -47,7 +47,10 @@ class UsagePollingService: ObservableObject {
     func pollNow() async {
         do {
             let credentials = try await keychainService.readCredentials()
-            let token = try await tokenRefreshService.refreshIfNeeded(credentials: credentials)
+            let token = try await tokenRefreshService.refreshIfNeeded(
+                credentials: credentials,
+                keychainService: keychainService
+            )
             let usage = try await api.fetchUsage(accessToken: token)
             self.latestUsage = usage
             self.lastError = nil
@@ -63,8 +66,17 @@ class UsagePollingService: ObservableObject {
     @MainActor
     private func retryWithRefresh() async {
         do {
-            let credentials = try await keychainService.readCredentials()
+            let credentials = try await keychainService.readCredentials(forceRefresh: true)
             let tokenResponse = try await tokenRefreshService.forceRefresh(refreshToken: credentials.refreshToken)
+            // Persist refreshed tokens to Battery's keychain
+            let updated = KeychainService.Credentials(
+                accessToken: tokenResponse.accessToken,
+                refreshToken: tokenResponse.refreshToken ?? credentials.refreshToken,
+                expiresAt: Date().addingTimeInterval(TimeInterval(tokenResponse.expiresIn)),
+                subscriptionType: credentials.subscriptionType,
+                rateLimitTier: credentials.rateLimitTier
+            )
+            await keychainService.updateCachedCredentials(updated)
             let usage = try await api.fetchUsage(accessToken: tokenResponse.accessToken)
             self.latestUsage = usage
             self.lastError = nil

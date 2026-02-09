@@ -2,6 +2,12 @@ import Foundation
 import Security
 
 /// Reads Claude Code OAuth credentials from the macOS Keychain.
+///
+/// To avoid repeated macOS password prompts, credentials are copied from
+/// Claude Code's keychain item (which it owns and whose ACL resets on token
+/// refresh) into Battery's own keychain item. Reads from Battery's item
+/// never trigger a password prompt. An in-memory cache sits in front of
+/// both to minimize I/O.
 actor KeychainService {
 
     struct Credentials {
@@ -35,12 +41,120 @@ actor KeychainService {
         }
     }
 
-    func readCredentials() throws -> Credentials {
+    // MARK: - Constants
+
+    private static let claudeCodeService = "Claude Code-credentials"
+    private static let batteryService = "com.allthingsclaude.battery-credentials"
+    private static let batteryAccount = "cached-oauth"
+
+    /// Re-read when token expires within this window.
+    private let cacheRefreshBuffer: TimeInterval = 600 // 10 minutes
+
+    // MARK: - In-memory cache
+
+    private var cachedCredentials: Credentials?
+
+    /// Returns valid credentials using a three-tier lookup:
+    /// 1. In-memory cache
+    /// 2. Battery's own keychain item (no prompt)
+    /// 3. Claude Code's keychain item (may prompt once)
+    func readCredentials(forceRefresh: Bool = false) throws -> Credentials {
+        // 1. Memory cache
+        if !forceRefresh, let cached = cachedCredentials,
+           cached.expiresAt.timeIntervalSinceNow > cacheRefreshBuffer {
+            return cached
+        }
+
+        // 2. Battery's own keychain item (never prompts)
+        if !forceRefresh, let credentials = try? readFromBatteryKeychain(),
+           credentials.expiresAt.timeIntervalSinceNow > cacheRefreshBuffer {
+            cachedCredentials = credentials
+            return credentials
+        }
+
+        // 3. Claude Code's keychain item (may prompt)
+        let credentials = try readFromClaudeCodeKeychain()
+        cachedCredentials = credentials
+        saveToBatteryKeychain(credentials)
+        return credentials
+    }
+
+    /// Clears the in-memory cache, forcing the next read to check keychain.
+    func invalidateCache() {
+        cachedCredentials = nil
+    }
+
+    /// Writes updated credentials to Battery's own keychain item and memory cache.
+    func updateCachedCredentials(_ credentials: Credentials) {
+        cachedCredentials = credentials
+        saveToBatteryKeychain(credentials)
+    }
+
+    // MARK: - Battery's own keychain item (prompt-free)
+
+    private func readFromBatteryKeychain() throws -> Credentials {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "Claude Code-credentials",
+            kSecAttrService as String: Self.batteryService,
+            kSecAttrAccount as String: Self.batteryAccount,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess, let data = result as? Data else {
+            throw KeychainError.itemNotFound
+        }
+
+        return try parseCredentials(data)
+    }
+
+    private func saveToBatteryKeychain(_ credentials: Credentials) {
+        let json = serializeCredentials(credentials)
+        guard let data = try? JSONSerialization.data(withJSONObject: json) else { return }
+
+        // Try updating first, then adding.
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.batteryService,
+            kSecAttrAccount as String: Self.batteryAccount,
+        ]
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+        ]
+
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+
+        if updateStatus == errSecItemNotFound {
+            var addQuery = query
+            addQuery[kSecValueData as String] = data
+            SecItemAdd(addQuery as CFDictionary, nil)
+        }
+    }
+
+    private func serializeCredentials(_ credentials: Credentials) -> [String: Any] {
+        return [
+            "claudeAiOauth": [
+                "accessToken": credentials.accessToken,
+                "refreshToken": credentials.refreshToken,
+                "expiresAt": credentials.expiresAt.timeIntervalSince1970 * 1000.0,
+                "subscriptionType": credentials.subscriptionType,
+                "rateLimitTier": credentials.rateLimitTier,
+            ] as [String: Any]
+        ]
+    }
+
+    // MARK: - Claude Code's keychain item (may prompt)
+
+    private func readFromClaudeCodeKeychain() throws -> Credentials {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.claudeCodeService,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
         var result: AnyObject?
@@ -59,6 +173,8 @@ actor KeychainService {
 
         return try parseCredentials(data)
     }
+
+    // MARK: - Parsing
 
     private func parseCredentials(_ data: Data) throws -> Credentials {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
