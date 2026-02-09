@@ -33,7 +33,7 @@ final class UsageDataTests: XCTestCase {
 
         let response = try JSONDecoder().decode(UsageResponse.self, from: json)
 
-        XCTAssertEqual(response.fiveHour.utilization, 45.2)
+        XCTAssertEqual(response.fiveHour?.utilization, 45.2)
         XCTAssertEqual(response.sevenDay.utilization, 23.8)
         XCTAssertEqual(response.sevenDaySonnet?.utilization, 12.1)
         XCTAssertEqual(response.sevenDayOpus?.utilization, 67.3)
@@ -57,7 +57,7 @@ final class UsageDataTests: XCTestCase {
 
         let response = try JSONDecoder().decode(UsageResponse.self, from: json)
 
-        XCTAssertEqual(response.fiveHour.utilization, 10.0)
+        XCTAssertEqual(response.fiveHour?.utilization, 10.0)
         XCTAssertNil(response.sevenDaySonnet)
         XCTAssertNil(response.sevenDayOpus)
         XCTAssertNil(response.extraUsage)
@@ -94,7 +94,7 @@ final class UsageDataTests: XCTestCase {
 
         let response = try JSONDecoder().decode(UsageResponse.self, from: json)
 
-        XCTAssertEqual(response.fiveHour.utilization, 100.0)
+        XCTAssertEqual(response.fiveHour?.utilization, 100.0)
         XCTAssertEqual(response.sevenDay.utilization, 46.0)
         XCTAssertEqual(response.sevenDaySonnet?.utilization, 6.0)
         XCTAssertNil(response.sevenDayOpus)
