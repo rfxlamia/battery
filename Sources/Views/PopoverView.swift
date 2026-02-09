@@ -88,7 +88,7 @@ struct PopoverView: View {
                 // Projections (Phase 2)
                 if viewModel.projection != nil {
                     Divider()
-                    ProjectionView(projection: viewModel.projection)
+                    ProjectionView(projection: viewModel.projection, sessionResetsAt: viewModel.sessionResetsAt)
                 }
 
                 // Stats: streak, heat map, 7-day chart (Phase 2+3)

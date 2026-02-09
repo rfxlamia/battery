@@ -3,6 +3,7 @@ import SwiftUI
 /// Displays burn rate projections when sufficient data is available.
 struct ProjectionView: View {
     let projection: BurnRateProjection?
+    let sessionResetsAt: Date?
 
     var body: some View {
         if let projection = projection, projection.currentRate != 0 {
@@ -20,14 +21,24 @@ struct ProjectionView: View {
 
                 if let limitTime = projection.projectedLimitTime {
                     let remaining = limitTime.timeIntervalSinceNow
+                    let limitAfterReset = sessionResetsAt.map { limitTime > $0 } ?? false
                     if remaining > 0 && remaining < 18000 { // Only show if < 5 hours away
                         HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.caption2)
-                                .foregroundStyle(remaining < 1800 ? .red : .orange)
-                            Text("Limit in \(TimeFormatting.shortDuration(remaining))")
-                                .font(.caption)
-                                .foregroundStyle(remaining < 1800 ? .red : .primary)
+                            if limitAfterReset {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
+                                Text("Limit in \(TimeFormatting.shortDuration(remaining)) (after reset)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(remaining < 1800 ? .red : .orange)
+                                Text("Limit in \(TimeFormatting.shortDuration(remaining))")
+                                    .font(.caption)
+                                    .foregroundStyle(remaining < 1800 ? .red : .primary)
+                            }
                         }
                     }
                 }

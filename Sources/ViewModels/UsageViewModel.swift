@@ -284,7 +284,8 @@ class UsageViewModel: ObservableObject {
                 self.notificationService.checkAndNotify(
                     sessionUtilization: usage.fiveHour.utilization,
                     weeklyUtilization: usage.sevenDay.utilization,
-                    projection: proj
+                    projection: proj,
+                    sessionResetsAt: usage.fiveHour.resetsAtDate
                 )
             }
         } catch {

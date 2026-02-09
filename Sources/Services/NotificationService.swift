@@ -26,15 +26,18 @@ class NotificationService {
         sessionUtilization: Double,
         weeklyUtilization: Double,
         projection: BurnRateProjection? = nil,
+        sessionResetsAt: Date? = nil,
         settings: AppSettings = .shared
     ) {
         // Threshold-based notifications
         checkThresholds(sessionUtilization: sessionUtilization, settings: settings)
 
         // Projection-based notification: projected to hit limit within 30 min
+        // Skip if the projected limit is after the session reset (usage resets first)
         if let projection = projection, let limitTime = projection.projectedLimitTime {
+            let limitAfterReset = sessionResetsAt.map { limitTime > $0 } ?? false
             let remaining = limitTime.timeIntervalSinceNow
-            if remaining > 0 && remaining < 1800 {
+            if remaining > 0 && remaining < 1800 && !limitAfterReset {
                 if shouldSendProjectionNotification() {
                     sendNotification(
                         title: "Approaching Usage Limit",
