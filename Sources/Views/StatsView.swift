@@ -15,7 +15,7 @@ struct StatsView: View {
                 // Streak
                 HStack(spacing: 4) {
                     Image(systemName: "flame.fill")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(currentStreak > 0 ? Color.orange : Color.gray.opacity(0.3))
                     Text("\(currentStreak)")
                         .font(.system(.caption, design: .rounded, weight: .semibold))
@@ -164,7 +164,7 @@ private struct SparklineChart: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: "chart.bar.fill")
-                    .font(.caption2)
+                    .font(.system(size: 9))
                     .foregroundStyle(.secondary)
                 Text("7-Day Usage")
                     .font(.caption)
