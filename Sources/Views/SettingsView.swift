@@ -119,8 +119,7 @@ struct SettingsView: View {
                         viewModel.openNotificationSettings()
                     }
                     .font(.caption)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
+                    .controlSize(.small)
                 }
             }
 
@@ -137,8 +136,7 @@ struct SettingsView: View {
                     viewModel.sendTestNotification()
                 }
                 .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .controlSize(.small)
             }
         }
     }
@@ -206,13 +204,12 @@ struct SettingsView: View {
                 .controlSize(.small)
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Button("Export Data") {
                     viewModel.exportData()
                 }
                 .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .controlSize(.small)
 
                 Spacer()
 
@@ -220,8 +217,7 @@ struct SettingsView: View {
                     Task { await viewModel.clearHistory() }
                 }
                 .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundStyle(Color(red: 1.0, green: 0.23, blue: 0.19))
+                .controlSize(.small)
             }
         }
     }
@@ -263,8 +259,7 @@ struct SettingsView: View {
                     updaterService.checkForUpdates()
                 }
                 .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .controlSize(.small)
                 .disabled(!updaterService.canCheckForUpdates)
             }
         }
