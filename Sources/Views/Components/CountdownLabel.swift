@@ -48,22 +48,35 @@ struct CountdownLabel: View {
             Image(systemName: "clock")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
-            if style == .compact {
-                Text("Resets in")
+            if style == .compact && remaining > 86400 {
+                // Weekly reset > 24h away: show absolute date
+                Text("Resets on \(Self.resetDateFormatter.string(from: targetDate))")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
-            }
-            Text(TimeFormatting.shortDuration(remaining))
-                .font(.caption)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-            if style == .full {
-                Text("remaining")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            } else {
+                if style == .compact {
+                    Text("Resets in")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                Text(TimeFormatting.shortDuration(remaining))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                if style == .full {
+                    Text("remaining")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
     }
+
+    private static let resetDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMM d 'at' h:mm a"
+        return f
+    }()
 
     private func elapsedView(remaining: TimeInterval) -> some View {
         let elapsed = max(0, windowDuration - remaining)
