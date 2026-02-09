@@ -3,7 +3,7 @@ import Foundation
 // MARK: - API Response Models
 
 struct UsageResponse: Codable {
-    let fiveHour: UsageBucket
+    let fiveHour: UsageBucket?
     let sevenDay: UsageBucket
     let sevenDaySonnet: UsageBucket?
     let sevenDayOpus: UsageBucket?
@@ -19,7 +19,7 @@ struct UsageResponse: Codable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        fiveHour = try container.decode(UsageBucket.self, forKey: .fiveHour)
+        fiveHour = try? container.decodeIfPresent(UsageBucket.self, forKey: .fiveHour)
         sevenDay = try container.decode(UsageBucket.self, forKey: .sevenDay)
         sevenDaySonnet = try? container.decodeIfPresent(UsageBucket.self, forKey: .sevenDaySonnet)
         sevenDayOpus = try? container.decodeIfPresent(UsageBucket.self, forKey: .sevenDayOpus)

@@ -210,8 +210,8 @@ class UsageViewModel: ObservableObject {
     }
 
     private func updateFromUsage(_ usage: UsageResponse) {
-        sessionUtilization = usage.fiveHour.utilization
-        sessionResetsAt = usage.fiveHour.resetsAtDate
+        sessionUtilization = usage.fiveHour?.utilization ?? 0
+        sessionResetsAt = usage.fiveHour?.resetsAtDate
         weeklyUtilization = usage.sevenDay.utilization
         weeklyResetsAt = usage.sevenDay.resetsAtDate
         sonnetUtilization = usage.sevenDaySonnet?.utilization
@@ -223,6 +223,11 @@ class UsageViewModel: ObservableObject {
         isConnected = true
         lastUpdated = Date()
         error = nil
+
+        // Clear projections when no active session
+        if usage.fiveHour == nil {
+            projection = nil
+        }
 
         // Track today's peak utilization (survives session resets)
         let today = Calendar.current.startOfDay(for: Date())
@@ -239,18 +244,20 @@ class UsageViewModel: ObservableObject {
         // Reset notification thresholds when utilization drops
         notificationService.resetThresholds(below: sessionUtilization)
 
-        // Save snapshot and compute projections
-        guard dbInitialized else { return }
+        // Save snapshot and compute projections (only with active session)
+        guard dbInitialized, usage.fiveHour != nil else { return }
         Task {
             await saveSnapshotAndProject(usage)
         }
     }
 
     private func saveSnapshotAndProject(_ usage: UsageResponse) async {
+        guard let fiveHour = usage.fiveHour else { return }
+
         // Save snapshot
         let snapshot = UsageSnapshot(
-            sessionUtilization: usage.fiveHour.utilization,
-            sessionResetsAt: usage.fiveHour.resetsAtDate ?? Date(),
+            sessionUtilization: fiveHour.utilization,
+            sessionResetsAt: fiveHour.resetsAtDate ?? Date(),
             weeklyUtilization: usage.sevenDay.utilization,
             weeklyResetsAt: usage.sevenDay.resetsAtDate ?? Date(),
             sonnetUtilization: usage.sevenDaySonnet?.utilization,
@@ -267,11 +274,11 @@ class UsageViewModel: ObservableObject {
         // Compute projections from recent snapshots
         do {
             let recentSnapshots = try await databaseService.getLatestSnapshots(count: 20)
-            guard let resetsAt = usage.fiveHour.resetsAtDate else { return }
+            guard let resetsAt = fiveHour.resetsAtDate else { return }
 
             let proj = BurnRateCalculator.calculate(
                 snapshots: recentSnapshots,
-                currentUtilization: usage.fiveHour.utilization,
+                currentUtilization: fiveHour.utilization,
                 resetsAt: resetsAt
             )
 
@@ -282,10 +289,10 @@ class UsageViewModel: ObservableObject {
             // Check notifications with projection data
             await MainActor.run {
                 self.notificationService.checkAndNotify(
-                    sessionUtilization: usage.fiveHour.utilization,
+                    sessionUtilization: fiveHour.utilization,
                     weeklyUtilization: usage.sevenDay.utilization,
                     projection: proj,
-                    sessionResetsAt: usage.fiveHour.resetsAtDate
+                    sessionResetsAt: fiveHour.resetsAtDate
                 )
             }
         } catch {

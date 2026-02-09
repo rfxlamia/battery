@@ -32,8 +32,8 @@ struct PopoverView: View {
             }
             .padding(.bottom, 4)
 
-            if let error = viewModel.error {
-                // Error state
+            if let error = viewModel.error, !viewModel.isConnected {
+                // Error state (only when we have no data at all)
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.title2)
@@ -46,13 +46,26 @@ struct PopoverView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             } else {
-                // Session gauge (5-hour)
-                SessionGaugeView(
-                    title: "Session (5-hour)",
-                    utilization: viewModel.sessionUtilization,
-                    resetsAt: viewModel.sessionResetsAt,
-                    color: viewModel.sessionColor
-                )
+                // Session gauge (5-hour) or no active session
+                if viewModel.sessionResetsAt != nil {
+                    SessionGaugeView(
+                        title: "Session (5-hour)",
+                        utilization: viewModel.sessionUtilization,
+                        resetsAt: viewModel.sessionResetsAt,
+                        color: viewModel.sessionColor
+                    )
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "moon.zzz.fill")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        Text("No active session")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
+                }
 
                 Divider()
 
