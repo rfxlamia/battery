@@ -34,7 +34,15 @@ enum BurnRateCalculator {
         currentUtilization: Double,
         resetsAt: Date
     ) -> BurnRateProjection {
-        guard snapshots.count >= minimumSnapshots else {
+        // Filter to only snapshots from the current session window.
+        // A session reset changes `sessionResetsAt`, so snapshots with a different
+        // reset time belong to a previous session and would poison the regression.
+        // Use 1-second tolerance to account for floating-point round-trips through SQLite.
+        let currentSessionSnapshots = snapshots.filter {
+            abs($0.sessionResetsAt.timeIntervalSince(resetsAt)) < 1.0
+        }
+
+        guard currentSessionSnapshots.count >= minimumSnapshots else {
             return BurnRateProjection(
                 currentRate: 0,
                 projectedLimitTime: nil,
@@ -43,7 +51,7 @@ enum BurnRateCalculator {
             )
         }
 
-        let sorted = snapshots.sorted { $0.timestamp < $1.timestamp }
+        let sorted = currentSessionSnapshots.sorted { $0.timestamp < $1.timestamp }
         let timeSpan = sorted.last!.timestamp.timeIntervalSince(sorted.first!.timestamp)
 
         guard timeSpan >= minimumTimeSpan else {
@@ -84,15 +92,17 @@ enum BurnRateCalculator {
             )
         }
 
-        // Slope = percentage points per hour
-        let slope = (n * sumXY - sumX * sumY) / denominator
+        // Slope = percentage points per hour.
+        // Clamp to non-negative: within a single session window, utilization
+        // can only increase (or stay flat). A negative slope would mean the
+        // regression data is noisy, not that usage is actually decreasing.
+        let rawSlope = (n * sumXY - sumX * sumY) / denominator
+        let slope = max(0, rawSlope)
 
         // Classify trend
         let trend: BurnRateProjection.Trend
         if slope > 1.0 {
             trend = .increasing
-        } else if slope < -1.0 {
-            trend = .decreasing
         } else {
             trend = .stable
         }

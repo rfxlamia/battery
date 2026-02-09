@@ -3,15 +3,19 @@ import XCTest
 
 final class BurnRateCalculatorTests: XCTestCase {
 
+    /// Shared reset time used by both `makeSnapshot` and `calculate` calls
+    /// so snapshots are recognized as belonging to the current session.
+    private let resetsAt = Date().addingTimeInterval(7200) // 2 hours from now
+
     private func makeSnapshot(
         minutesAgo: Double,
         sessionUtilization: Double,
-        resetsAtMinutesFromNow: Double = 120
+        sessionResetsAt: Date? = nil
     ) -> UsageSnapshot {
         UsageSnapshot(
             timestamp: Date().addingTimeInterval(-minutesAgo * 60),
             sessionUtilization: sessionUtilization,
-            sessionResetsAt: Date().addingTimeInterval(resetsAtMinutesFromNow * 60),
+            sessionResetsAt: sessionResetsAt ?? resetsAt,
             weeklyUtilization: 20,
             weeklyResetsAt: Date().addingTimeInterval(86400)
         )
@@ -26,7 +30,7 @@ final class BurnRateCalculatorTests: XCTestCase {
         let result = BurnRateCalculator.calculate(
             snapshots: snapshots,
             currentUtilization: 25,
-            resetsAt: Date().addingTimeInterval(3600)
+            resetsAt: resetsAt
         )
 
         XCTAssertEqual(result.currentRate, 0)
@@ -46,7 +50,7 @@ final class BurnRateCalculatorTests: XCTestCase {
         let result = BurnRateCalculator.calculate(
             snapshots: snapshots,
             currentUtilization: 40,
-            resetsAt: Date().addingTimeInterval(3600)
+            resetsAt: resetsAt
         )
 
         XCTAssertEqual(result.currentRate, 0, accuracy: 0.1)
@@ -66,7 +70,7 @@ final class BurnRateCalculatorTests: XCTestCase {
         let result = BurnRateCalculator.calculate(
             snapshots: snapshots,
             currentUtilization: 40,
-            resetsAt: Date().addingTimeInterval(3600)
+            resetsAt: resetsAt
         )
 
         XCTAssertGreaterThan(result.currentRate, 50)  // ~60%/hr
@@ -82,8 +86,9 @@ final class BurnRateCalculatorTests: XCTestCase {
         }
     }
 
-    func testDecreasingTrend() {
-        // Decreasing utilization (e.g., after a reset)
+    func testDecreasingDataClampedToZero() {
+        // Decreasing utilization values within a session should be clamped to 0 rate,
+        // since usage can only increase within a single session window.
         let snapshots = [
             makeSnapshot(minutesAgo: 30, sessionUtilization: 80),
             makeSnapshot(minutesAgo: 20, sessionUtilization: 60),
@@ -93,12 +98,36 @@ final class BurnRateCalculatorTests: XCTestCase {
         let result = BurnRateCalculator.calculate(
             snapshots: snapshots,
             currentUtilization: 20,
-            resetsAt: Date().addingTimeInterval(3600)
+            resetsAt: resetsAt
         )
 
-        XCTAssertLessThan(result.currentRate, -1.0)
-        XCTAssertNil(result.projectedLimitTime)  // Decreasing, won't hit 100%
-        XCTAssertEqual(result.trend, .decreasing)
+        XCTAssertEqual(result.currentRate, 0, accuracy: 0.001)
+        XCTAssertNil(result.projectedLimitTime)
+        XCTAssertEqual(result.trend, .stable)
+    }
+
+    func testCrossSessionSnapshotsFiltered() {
+        // Snapshots from a previous session (different resetsAt) should be ignored.
+        // Old session had high utilization, current session just started.
+        let oldResetsAt = Date().addingTimeInterval(-1800) // old session reset 30 min ago
+        let snapshots = [
+            makeSnapshot(minutesAgo: 60, sessionUtilization: 70, sessionResetsAt: oldResetsAt),
+            makeSnapshot(minutesAgo: 50, sessionUtilization: 80, sessionResetsAt: oldResetsAt),
+            makeSnapshot(minutesAgo: 40, sessionUtilization: 90, sessionResetsAt: oldResetsAt),
+            // Current session snapshots (only 2, below minimum)
+            makeSnapshot(minutesAgo: 5, sessionUtilization: 5),
+            makeSnapshot(minutesAgo: 0, sessionUtilization: 8),
+        ]
+        let result = BurnRateCalculator.calculate(
+            snapshots: snapshots,
+            currentUtilization: 8,
+            resetsAt: resetsAt
+        )
+
+        // Should fall back to stable because only 2 current-session snapshots
+        XCTAssertEqual(result.currentRate, 0)
+        XCTAssertEqual(result.projectedAtReset, 8)
+        XCTAssertEqual(result.trend, .stable)
     }
 
     func testHighBurnRate() {
@@ -112,7 +141,7 @@ final class BurnRateCalculatorTests: XCTestCase {
         let result = BurnRateCalculator.calculate(
             snapshots: snapshots,
             currentUtilization: 80,
-            resetsAt: Date().addingTimeInterval(3600)
+            resetsAt: resetsAt
         )
 
         XCTAssertGreaterThan(result.currentRate, 200)
@@ -138,7 +167,7 @@ final class BurnRateCalculatorTests: XCTestCase {
         let result = BurnRateCalculator.calculate(
             snapshots: snapshots,
             currentUtilization: 80,
-            resetsAt: Date().addingTimeInterval(7200) // 2 hours away
+            resetsAt: resetsAt
         )
 
         XCTAssertLessThanOrEqual(result.projectedAtReset, 100)
@@ -154,7 +183,7 @@ final class BurnRateCalculatorTests: XCTestCase {
         let result = BurnRateCalculator.calculate(
             snapshots: snapshots,
             currentUtilization: 34,
-            resetsAt: Date().addingTimeInterval(3600)
+            resetsAt: resetsAt
         )
 
         XCTAssertEqual(result.currentRate, 0)

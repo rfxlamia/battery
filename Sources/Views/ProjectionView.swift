@@ -88,6 +88,6 @@ struct ProjectionView: View {
         if absRate < 0.1 {
             return "Burn rate: minimal"
         }
-        return String(format: "Burn rate: %.1f%%/hr", rate)
+        return String(format: "Burn rate: %.1f%%/hr", absRate)
     }
 }
