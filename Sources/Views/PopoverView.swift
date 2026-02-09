@@ -120,12 +120,14 @@ struct PopoverView: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
 
                 Button(action: { viewModel.refresh() }) {
                     Image(systemName: "arrow.clockwise")
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
 
                 Button(action: { updaterService.checkForUpdates() }) {
                     Image(systemName: "arrow.down.circle")
@@ -134,6 +136,7 @@ struct PopoverView: View {
                 .buttonStyle(.plain)
                 .disabled(!updaterService.canCheckForUpdates)
                 .help("Check for Updates")
+                .focusable(false)
 
                 Button(action: { NSApplication.shared.terminate(nil) }) {
                     Text("Quit")
@@ -141,6 +144,7 @@ struct PopoverView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
+                .focusable(false)
             }
         }
         .padding(16)
