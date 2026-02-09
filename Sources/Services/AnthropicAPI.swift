@@ -63,19 +63,22 @@ actor AnthropicAPI {
                 throw APIError.serverError(statusCode: httpResponse.statusCode, body: body)
             }
 
-            // Debug: always write raw response to file
+            #if DEBUG
             if let rawJSON = String(data: data, encoding: .utf8) {
                 let debugPath = FileManager.default.homeDirectoryForCurrentUser
                     .appendingPathComponent(".battery_debug_response.json").path
                 try? rawJSON.write(toFile: debugPath, atomically: true, encoding: .utf8)
             }
+            #endif
 
             do {
                 return try JSONDecoder().decode(UsageResponse.self, from: data)
             } catch {
+                #if DEBUG
                 let debugPath = FileManager.default.homeDirectoryForCurrentUser
                     .appendingPathComponent(".battery_debug_error.txt").path
                 try? "\(error)".write(toFile: debugPath, atomically: true, encoding: .utf8)
+                #endif
                 throw APIError.decodingError(error)
             }
         } catch let error as APIError {

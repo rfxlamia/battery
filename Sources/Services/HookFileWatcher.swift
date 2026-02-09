@@ -18,6 +18,11 @@ class HookFileWatcher: ObservableObject {
     /// How long after last activity before we consider the session idle
     private let idleTimeout: TimeInterval = 300  // 5 minutes
 
+    /// Rate limiting: max events processed per second
+    private let maxEventsPerSecond: Int = 50
+    private var recentEventCount: Int = 0
+    private var rateLimitResetTime: Date = .distantPast
+
     private var idleTimer: Timer?
 
     init() {
@@ -26,11 +31,23 @@ class HookFileWatcher: ObservableObject {
     }
 
     func startWatching() {
-        // Ensure the directory and file exist
+        // Ensure the directory and file exist with restrictive permissions
         let dir = (eventsFilePath as NSString).deletingLastPathComponent
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            atPath: dir, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
         if !FileManager.default.fileExists(atPath: eventsFilePath) {
-            FileManager.default.createFile(atPath: eventsFilePath, contents: nil)
+            FileManager.default.createFile(
+                atPath: eventsFilePath, contents: nil,
+                attributes: [.posixPermissions: 0o600]
+            )
+        }
+
+        // Verify the file is not a symlink to prevent symlink attacks
+        guard !isSymlink(atPath: eventsFilePath) else {
+            print("HookFileWatcher: Refusing to open symlink at \(eventsFilePath)")
+            return
         }
 
         // Open file handle for reading
@@ -100,15 +117,34 @@ class HookFileWatcher: ObservableObject {
     }
 
     private func processEventLine(_ line: String) {
+        // Enforce max line length to prevent memory abuse
+        guard line.count <= 4096 else { return }
+
+        // Rate limiting: reject events if processing too fast
+        let now = Date()
+        if now.timeIntervalSince(rateLimitResetTime) >= 1.0 {
+            recentEventCount = 0
+            rateLimitResetTime = now
+        }
+        recentEventCount += 1
+        guard recentEventCount <= maxEventsPerSecond else { return }
+
         guard let data = line.data(using: .utf8) else { return }
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
 
         guard let event = try? decoder.decode(SessionEvent.self, from: data) else {
-            print("HookFileWatcher: Failed to parse event: \(line)")
             return
         }
+
+        // Validate timestamp is within reasonable range (±1 hour)
+        let age = abs(event.timestamp.timeIntervalSinceNow)
+        guard age < 3600 else { return }
+
+        // Validate string field lengths
+        if let sid = event.sessionId, sid.count > 128 { return }
+        if let tool = event.tool, tool.count > 256 { return }
 
         DispatchQueue.main.async { [weak self] in
             self?.handleEvent(event)
@@ -143,6 +179,9 @@ class HookFileWatcher: ObservableObject {
 
     /// Parse the last few lines of the events file to determine current state on launch.
     private func parseRecentEvents() {
+        // Verify the file is not a symlink before reading
+        guard !isSymlink(atPath: eventsFilePath) else { return }
+
         guard let data = FileManager.default.contents(atPath: eventsFilePath),
               let text = String(data: data, encoding: .utf8) else { return }
 
@@ -213,5 +252,12 @@ class HookFileWatcher: ObservableObject {
             currentSessionStart = nil
             currentSessionId = nil
         }
+    }
+
+    /// Check if a path is a symbolic link (defense against symlink attacks).
+    private func isSymlink(atPath path: String) -> Bool {
+        var statInfo = stat()
+        guard lstat(path, &statInfo) == 0 else { return false }
+        return (statInfo.st_mode & S_IFMT) == S_IFLNK
     }
 }

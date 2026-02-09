@@ -22,9 +22,13 @@ actor DatabaseService {
     func initialize() throws {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let batteryDir = appSupport.appendingPathComponent("Battery", isDirectory: true)
-        try FileManager.default.createDirectory(at: batteryDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: batteryDir, withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
         let dbPath = batteryDir.appendingPathComponent("battery.db").path
         db = try Connection(dbPath)
+
+        // Restrict database file permissions to owner-only
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: dbPath)
 
         try db?.run(snapshots.create(ifNotExists: true) { t in
             t.column(colId, primaryKey: true)

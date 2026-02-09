@@ -12,9 +12,12 @@ jobs:
     runs-on: macos-latest
     permissions:
       contents: write
+      issues: none
+      pull-requests: none
+      packages: none
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
 
@@ -23,6 +26,11 @@ jobs:
         id: version
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
+          # Validate tag is a valid semver to prevent injection
+          if ! [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Invalid version tag format '$TAG'. Expected X.Y.Z"
+            exit 1
+          fi
           echo "version=$TAG" >> "$GITHUB_OUTPUT"
           echo "tag=v$TAG" >> "$GITHUB_OUTPUT"
           # Build number = total commit count
@@ -109,8 +117,22 @@ jobs:
           SIGN_UPDATE=$(find .build -name "sign_update" -type f 2>/dev/null | head -1)
           if [[ -z "$SIGN_UPDATE" ]]; then
             echo "Warning: sign_update not found, downloading from Sparkle release..."
-            curl -sL "https://github.com/sparkle-project/Sparkle/releases/latest/download/Sparkle-2.6.4.tar.xz" \
-              | tar xJ --include="*/bin/sign_update" -C "$RUNNER_TEMP"
+            SPARKLE_VERSION="2.6.4"
+            SPARKLE_URL="https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+            SPARKLE_ARCHIVE="$RUNNER_TEMP/Sparkle-${SPARKLE_VERSION}.tar.xz"
+            curl -sL -o "$SPARKLE_ARCHIVE" "$SPARKLE_URL"
+
+            # Verify download integrity
+            EXPECTED_SHA256="50612a06038abc931f16011d7903b8326a362c1074dabccb718404ce8e585f0b"
+            ACTUAL_SHA256=$(shasum -a 256 "$SPARKLE_ARCHIVE" | awk '{print $1}')
+            if [[ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]]; then
+              echo "Error: Sparkle archive checksum mismatch!"
+              echo "  Expected: $EXPECTED_SHA256"
+              echo "  Actual:   $ACTUAL_SHA256"
+              exit 1
+            fi
+
+            tar xJf "$SPARKLE_ARCHIVE" --include="*/bin/sign_update" -C "$RUNNER_TEMP"
             SIGN_UPDATE="$RUNNER_TEMP/bin/sign_update"
             chmod +x "$SIGN_UPDATE"
           fi
@@ -148,28 +170,43 @@ jobs:
 
           cd gh-pages-dir
 
-          # Insert new item before </channel>
-          ITEM="        <item>\n"
-          ITEM+="            <title>Version $VERSION</title>\n"
-          ITEM+="            <pubDate>$PUB_DATE</pubDate>\n"
-          ITEM+="            <sparkle:version>$BUILD</sparkle:version>\n"
-          ITEM+="            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>\n"
-          ITEM+="            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>\n"
-          ITEM+="            <enclosure\n"
-          ITEM+="                url=\"$DMG_URL\"\n"
-          ITEM+="                length=\"$SIZE\"\n"
-          ITEM+="                type=\"application/octet-stream\"\n"
-          ITEM+="                sparkle:edSignature=\"$SIGNATURE\"\n"
-          ITEM+="            />\n"
-          ITEM+="        </item>\n"
+          # Insert new item before </channel> using Python with env vars
+          export APPCAST_VERSION="$VERSION"
+          export APPCAST_BUILD="$BUILD"
+          export APPCAST_PUB_DATE="$PUB_DATE"
+          export APPCAST_DMG_URL="$DMG_URL"
+          export APPCAST_SIZE="$SIZE"
+          export APPCAST_SIGNATURE="$SIGNATURE"
 
           python3 -c "
-          import sys
-          item = sys.argv[1]
+          import os, html
+
+          v = html.escape(os.environ['APPCAST_VERSION'])
+          b = html.escape(os.environ['APPCAST_BUILD'])
+          pub = html.escape(os.environ['APPCAST_PUB_DATE'])
+          url = html.escape(os.environ['APPCAST_DMG_URL'])
+          size = html.escape(os.environ['APPCAST_SIZE'])
+          sig = html.escape(os.environ['APPCAST_SIGNATURE'])
+
+          item = f'''        <item>
+                      <title>Version {v}</title>
+                      <pubDate>{pub}</pubDate>
+                      <sparkle:version>{b}</sparkle:version>
+                      <sparkle:shortVersionString>{v}</sparkle:shortVersionString>
+                      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+                      <enclosure
+                          url=\"{url}\"
+                          length=\"{size}\"
+                          type=\"application/octet-stream\"
+                          sparkle:edSignature=\"{sig}\"
+                      />
+                  </item>
+          '''
+
           appcast = open('appcast.xml').read()
           appcast = appcast.replace('</channel>', item + '    </channel>')
           open('appcast.xml', 'w').write(appcast)
-          " "$(echo -e "$ITEM")"
+          "
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

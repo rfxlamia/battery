@@ -60,8 +60,12 @@ actor TokenRefreshService {
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
-        let body = "grant_type=refresh_token&refresh_token=\(refreshToken)"
-        request.httpBody = body.data(using: .utf8)
+        var components = URLComponents()
+        components.queryItems = [
+            URLQueryItem(name: "grant_type", value: "refresh_token"),
+            URLQueryItem(name: "refresh_token", value: refreshToken),
+        ]
+        request.httpBody = components.percentEncodedQuery?.data(using: .utf8)
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
