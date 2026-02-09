@@ -1,6 +1,8 @@
 # Battery
 > by All Things Claude
 
+![Battery](assets/battery.webp)
+
 A macOS menu bar app that monitors your Claude Code API usage in real time.
 
 Battery lives in your menu bar and shows how much of your Claude Code rate limit you've used across both the 5-hour session window and the 7-day weekly window. It helps you pace your usage, avoid hitting limits unexpectedly, and stay informed about your consumption patterns.
