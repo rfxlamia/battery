@@ -4,10 +4,11 @@ import Security
 /// Reads Claude Code OAuth credentials from the macOS Keychain.
 ///
 /// To avoid repeated macOS password prompts, credentials are copied from
-/// Claude Code's keychain item (which it owns and whose ACL resets on token
-/// refresh) into Battery's own keychain item. Reads from Battery's item
-/// never trigger a password prompt. An in-memory cache sits in front of
-/// both to minimize I/O.
+/// Claude Code's keychain item into Battery's own keychain item on first
+/// launch. Subsequent reads always use Battery's item (which never triggers
+/// a prompt). When the access token nears expiry, the caller refreshes it
+/// via OAuth using the stored refresh token — Claude Code's keychain is
+/// only re-read as a last resort if the refresh token itself is invalid.
 actor KeychainService {
 
     struct Credentials {
@@ -54,10 +55,11 @@ actor KeychainService {
 
     private var cachedCredentials: Credentials?
 
-    /// Returns valid credentials using a three-tier lookup:
-    /// 1. In-memory cache
-    /// 2. Battery's own keychain item (no prompt)
-    /// 3. Claude Code's keychain item (may prompt once)
+    /// Returns credentials using a three-tier lookup:
+    /// 1. In-memory cache (if fresh)
+    /// 2. Battery's own keychain item (no prompt) — returns even if near-expiry,
+    ///    since the caller can refresh via OAuth using the refresh token
+    /// 3. Claude Code's keychain item (may prompt once on first run)
     func readCredentials(forceRefresh: Bool = false) throws -> Credentials {
         // 1. Memory cache
         if !forceRefresh, let cached = cachedCredentials,
@@ -65,14 +67,23 @@ actor KeychainService {
             return cached
         }
 
-        // 2. Battery's own keychain item (never prompts)
-        if !forceRefresh, let credentials = try? readFromBatteryKeychain(),
-           credentials.expiresAt.timeIntervalSinceNow > cacheRefreshBuffer {
+        // 2. Battery's own keychain item (never prompts).
+        //    Returns even if near-expiry — the caller handles OAuth refresh.
+        if let credentials = try? readFromBatteryKeychain() {
             cachedCredentials = credentials
             return credentials
         }
 
-        // 3. Claude Code's keychain item (may prompt)
+        // 3. Claude Code's keychain item (may prompt once)
+        let credentials = try readFromClaudeCodeKeychain()
+        cachedCredentials = credentials
+        saveToBatteryKeychain(credentials)
+        return credentials
+    }
+
+    /// Reads directly from Claude Code's keychain (may trigger macOS password prompt).
+    /// Use only as a last resort when Battery's cached refresh token is invalid.
+    func readFromClaudeCodeAndCache() throws -> Credentials {
         let credentials = try readFromClaudeCodeKeychain()
         cachedCredentials = credentials
         saveToBatteryKeychain(credentials)

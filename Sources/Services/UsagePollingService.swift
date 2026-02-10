@@ -56,8 +56,10 @@ class UsagePollingService: ObservableObject {
             self.lastError = nil
         } catch {
             self.lastError = error
-            // On 401, try once more with forced refresh
+            // On 401 or token refresh failure, try recovery
             if let apiError = error as? AnthropicAPI.APIError, apiError.isUnauthorized {
+                await retryWithRefresh()
+            } else if error is TokenRefreshService.TokenError {
                 await retryWithRefresh()
             }
         }
@@ -66,9 +68,9 @@ class UsagePollingService: ObservableObject {
     @MainActor
     private func retryWithRefresh() async {
         do {
+            // Try OAuth refresh using Battery's cached credentials (no password prompt)
             let credentials = try await keychainService.readCredentials(forceRefresh: true)
             let tokenResponse = try await tokenRefreshService.forceRefresh(refreshToken: credentials.refreshToken)
-            // Persist refreshed tokens to Battery's keychain
             let updated = KeychainService.Credentials(
                 accessToken: tokenResponse.accessToken,
                 refreshToken: tokenResponse.refreshToken ?? credentials.refreshToken,
@@ -78,6 +80,24 @@ class UsagePollingService: ObservableObject {
             )
             await keychainService.updateCachedCredentials(updated)
             let usage = try await api.fetchUsage(accessToken: tokenResponse.accessToken)
+            self.latestUsage = usage
+            self.lastError = nil
+        } catch {
+            // OAuth refresh failed (e.g. refresh token expired) — last resort:
+            // read from Claude Code's keychain (may prompt once)
+            await retryFromClaudeCodeKeychain()
+        }
+    }
+
+    @MainActor
+    private func retryFromClaudeCodeKeychain() async {
+        do {
+            let credentials = try await keychainService.readFromClaudeCodeAndCache()
+            let token = try await tokenRefreshService.refreshIfNeeded(
+                credentials: credentials,
+                keychainService: keychainService
+            )
+            let usage = try await api.fetchUsage(accessToken: token)
             self.latestUsage = usage
             self.lastError = nil
         } catch {
