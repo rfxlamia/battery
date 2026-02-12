@@ -16,7 +16,7 @@ struct StatsView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "flame.fill")
                         .font(.caption2)
-                        .foregroundStyle(currentStreak > 0 ? (AppSettings.shared.activeTheme == .classic ? ColorTheme.brand : Color.orange) : Color.gray.opacity(0.3))
+                        .foregroundStyle(currentStreak > 0 ? (AppSettings.shared.activeTheme == .default ? ColorTheme.brand : Color.orange) : Color.gray.opacity(0.3))
                     Text("\(currentStreak)")
                         .font(.system(.caption, design: .rounded, weight: .semibold))
                     Text("day streak")
@@ -114,12 +114,12 @@ private struct HeatMapView: View {
     private func heatColor(for peak: Double?) -> Color {
         guard let peak = peak else { return Color.primary.opacity(0.05) }
         switch AppSettings.shared.activeTheme {
-        case .classic:
+        case .default:
             if peak >= 75 { return ColorTheme.brandDark.opacity(0.8) }
             if peak >= 50 { return ColorTheme.brand.opacity(0.7) }
             if peak >= 25 { return ColorTheme.brandLight.opacity(0.7) }
             return ColorTheme.brandLighter.opacity(0.6)
-        case .colorful:
+        case .classic:
             if peak >= 75 { return .red.opacity(0.7) }
             if peak >= 50 { return .orange.opacity(0.6) }
             if peak >= 25 { return .yellow.opacity(0.5) }
@@ -151,12 +151,12 @@ private struct SparklineChart: View {
 
     private func peakColor(for value: Double) -> Color {
         switch theme {
-        case .classic:
+        case .default:
             if value >= 75 { return ColorTheme.brandDark }
             if value >= 50 { return ColorTheme.brand }
             if value >= 25 { return ColorTheme.brandLight }
             return ColorTheme.brandLighter
-        case .colorful:
+        case .classic:
             if value >= 75 { return .red }
             if value >= 50 { return .orange }
             if value >= 25 { return .yellow }
@@ -166,7 +166,7 @@ private struct SparklineChart: View {
 
     private var heatGradient: LinearGradient {
         switch theme {
-        case .classic:
+        case .default:
             return .linearGradient(
                 stops: [
                     .init(color: ColorTheme.brandLighter.opacity(0.4), location: 0),
@@ -177,7 +177,7 @@ private struct SparklineChart: View {
                 startPoint: .bottom,
                 endPoint: .top
             )
-        case .colorful:
+        case .classic:
             return .linearGradient(
                 stops: [
                     .init(color: .green.opacity(0.4), location: 0),
@@ -193,7 +193,7 @@ private struct SparklineChart: View {
 
     private var areaGradient: LinearGradient {
         switch theme {
-        case .classic:
+        case .default:
             return .linearGradient(
                 stops: [
                     .init(color: ColorTheme.brandLighter.opacity(0.05), location: 0),
@@ -205,7 +205,7 @@ private struct SparklineChart: View {
                 startPoint: .bottom,
                 endPoint: .top
             )
-        case .colorful:
+        case .classic:
             return .linearGradient(
                 stops: [
                     .init(color: .green.opacity(0.05), location: 0),

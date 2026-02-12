@@ -37,14 +37,14 @@ enum UsageLevel: String, CaseIterable {
 
     func color(for theme: ColorTheme) -> Color {
         switch theme {
-        case .classic:
+        case .default:
             switch self {
             case .low:      return ColorTheme.brand
             case .moderate: return ColorTheme.brand
             case .high:     return ColorTheme.brandDark
             case .critical: return ColorTheme.brandDark
             }
-        case .colorful:
+        case .classic:
             switch self {
             case .low:      return .green
             case .moderate: return .yellow

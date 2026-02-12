@@ -161,6 +161,6 @@ struct PopoverView: View {
             }
         }
         .padding(16)
-        .background(AppSettings.shared.activeTheme == .classic ? ColorTheme.background : Color.clear)
+        .background(AppSettings.shared.activeTheme == .default ? ColorTheme.background : Color.clear)
     }
 }

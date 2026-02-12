@@ -89,22 +89,22 @@ struct ProjectionView: View {
     private var theme: ColorTheme { AppSettings.shared.activeTheme }
 
     private var warningColor: Color {
-        theme == .classic ? ColorTheme.brand : .orange
+        theme == .default ? ColorTheme.brand : .orange
     }
 
     private var warningCriticalColor: Color {
-        theme == .classic ? ColorTheme.brandDark : .red
+        theme == .default ? ColorTheme.brandDark : .red
     }
 
     private func trendColor(_ trend: BurnRateProjection.Trend) -> Color {
         switch theme {
-        case .classic:
+        case .default:
             switch trend {
             case .increasing: return ColorTheme.brand
             case .stable: return .blue
             case .decreasing: return .green
             }
-        case .colorful:
+        case .classic:
             switch trend {
             case .increasing: return .orange
             case .stable: return .blue

@@ -2,17 +2,17 @@ import SwiftUI
 
 /// Color theme for the app UI.
 enum ColorTheme: String, CaseIterable {
-    case classic   // Warm terracotta monochrome palette
-    case colorful  // Multi-color green/yellow/orange/red
+    case `default`  // Warm terracotta monochrome palette
+    case classic    // Multi-color green/yellow/orange/red
 
     var displayName: String {
         switch self {
-        case .classic: return "Default"
-        case .colorful: return "Classic"
+        case .default: return "Default"
+        case .classic: return "Classic"
         }
     }
 
-    // MARK: - Classic Theme Colors
+    // MARK: - Default Theme Colors
 
     /// Primary brand color — terracotta orange (#D97757)
     static let brand = Color(hex: 0xD97757)
@@ -55,7 +55,7 @@ class AppSettings: ObservableObject {
     @AppStorage("notifyAt95") var notifyAt95: Bool = true
 
     // Display
-    @AppStorage("colorTheme") var colorTheme: String = ColorTheme.classic.rawValue
+    @AppStorage("colorTheme") var colorTheme: String = ColorTheme.default.rawValue
     @AppStorage("showMenuBarIcon") var showMenuBarIcon: Bool = true
     @AppStorage("showMenuBarText") var showMenuBarText: Bool = true
     @AppStorage("menuBarDisplayMode") var menuBarDisplayMode: String = MenuBarDisplayMode.percentageAndTime.rawValue
@@ -78,7 +78,7 @@ class AppSettings: ObservableObject {
     }
 
     var activeTheme: ColorTheme {
-        get { ColorTheme(rawValue: colorTheme) ?? .classic }
+        get { ColorTheme(rawValue: colorTheme) ?? .default }
         set { colorTheme = newValue.rawValue }
     }
 }
