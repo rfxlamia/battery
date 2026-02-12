@@ -40,7 +40,7 @@ struct SettingsView: View {
         }
         .frame(width: 320)
         .fixedSize(horizontal: false, vertical: true)
-        .background(AppSettings.shared.activeTheme == .default ? ColorTheme.background : Color.clear)
+        .background(AppSettings.shared.activeTheme == .default ? ColorTheme.background : ColorTheme.classicBackground)
     }
 
     // MARK: - Display

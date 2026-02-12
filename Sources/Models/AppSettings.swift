@@ -24,8 +24,24 @@ enum ColorTheme: String, CaseIterable {
     static let brandLighter = Color(hex: 0xF5D9CB)
     /// Track/background color (#E6E0D8)
     static let trackBG = Color(hex: 0xE6E0D8)
-    /// Screen background (#FAF8F4)
-    static let background = Color(hex: 0xFAF8F4)
+    /// Classic theme background — light: white 50%, dark: black 30%
+    static let classicBackground = Color(nsColor: NSColor(
+        name: nil,
+        dynamicProvider: { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(white: 0, alpha: 0.3)
+                : NSColor(white: 1, alpha: 0.5)
+        }
+    ))
+    /// Screen background — light: #FAF8F4, dark: #191814 (slightly transparent)
+    static let background = Color(nsColor: NSColor(
+        name: nil,
+        dynamicProvider: { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(red: 0x19/255.0, green: 0x18/255.0, blue: 0x14/255.0, alpha: 0.3)
+                : NSColor(red: 0xFA/255.0, green: 0xF8/255.0, blue: 0xF4/255.0, alpha: 0.5)
+        }
+    ))
 }
 
 /// Display modes for menu bar text.
