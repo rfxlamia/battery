@@ -1,5 +1,16 @@
 import SwiftUI
 
+extension Color {
+    init(hex: UInt, opacity: Double = 1.0) {
+        self.init(
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: opacity
+        )
+    }
+}
+
 /// Maps utilization percentages to color-coded severity levels.
 enum UsageLevel: String, CaseIterable {
     case low       // 0-50%  green
@@ -21,11 +32,25 @@ enum UsageLevel: String, CaseIterable {
     }
 
     var color: Color {
-        switch self {
-        case .low:      return .green
-        case .moderate: return .yellow
-        case .high:     return .orange
-        case .critical: return .red
+        color(for: AppSettings.shared.activeTheme)
+    }
+
+    func color(for theme: ColorTheme) -> Color {
+        switch theme {
+        case .classic:
+            switch self {
+            case .low:      return ColorTheme.brand
+            case .moderate: return ColorTheme.brand
+            case .high:     return ColorTheme.brandDark
+            case .critical: return ColorTheme.brandDark
+            }
+        case .colorful:
+            switch self {
+            case .low:      return .green
+            case .moderate: return .yellow
+            case .high:     return .orange
+            case .critical: return .red
+            }
         }
     }
 

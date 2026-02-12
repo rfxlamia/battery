@@ -16,7 +16,7 @@ struct StatsView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "flame.fill")
                         .font(.caption2)
-                        .foregroundStyle(currentStreak > 0 ? Color.orange : Color.gray.opacity(0.3))
+                        .foregroundStyle(currentStreak > 0 ? (AppSettings.shared.activeTheme == .classic ? ColorTheme.brand : Color.orange) : Color.gray.opacity(0.3))
                     Text("\(currentStreak)")
                         .font(.system(.caption, design: .rounded, weight: .semibold))
                     Text("day streak")
@@ -113,10 +113,18 @@ private struct HeatMapView: View {
 
     private func heatColor(for peak: Double?) -> Color {
         guard let peak = peak else { return Color.primary.opacity(0.05) }
-        if peak >= 75 { return .red.opacity(0.7) }
-        if peak >= 50 { return .orange.opacity(0.6) }
-        if peak >= 25 { return .yellow.opacity(0.5) }
-        return .green.opacity(0.4)
+        switch AppSettings.shared.activeTheme {
+        case .classic:
+            if peak >= 75 { return ColorTheme.brandDark.opacity(0.8) }
+            if peak >= 50 { return ColorTheme.brand.opacity(0.7) }
+            if peak >= 25 { return ColorTheme.brandLight.opacity(0.7) }
+            return ColorTheme.brandLighter.opacity(0.6)
+        case .colorful:
+            if peak >= 75 { return .red.opacity(0.7) }
+            if peak >= 50 { return .orange.opacity(0.6) }
+            if peak >= 25 { return .yellow.opacity(0.5) }
+            return .green.opacity(0.4)
+        }
     }
 
     private func dayTooltip(day: Date, peak: Double?) -> String {
@@ -139,25 +147,77 @@ private struct SparklineChart: View {
         Calendar.current.isDateInToday(date) ? "Today" : date.formatted(.dateTime.weekday(.wide))
     }
 
+    private var theme: ColorTheme { AppSettings.shared.activeTheme }
+
     private func peakColor(for value: Double) -> Color {
-        if value >= 75 { return .red }
-        if value >= 50 { return .orange }
-        if value >= 25 { return .yellow }
-        return .green
+        switch theme {
+        case .classic:
+            if value >= 75 { return ColorTheme.brandDark }
+            if value >= 50 { return ColorTheme.brand }
+            if value >= 25 { return ColorTheme.brandLight }
+            return ColorTheme.brandLighter
+        case .colorful:
+            if value >= 75 { return .red }
+            if value >= 50 { return .orange }
+            if value >= 25 { return .yellow }
+            return .green
+        }
     }
 
-    /// Gradient matching heatmap colors: green (bottom) → yellow → orange → red (top)
     private var heatGradient: LinearGradient {
-        .linearGradient(
-            stops: [
-                .init(color: .green.opacity(0.4), location: 0),
-                .init(color: .yellow.opacity(0.5), location: 0.25),
-                .init(color: .orange.opacity(0.6), location: 0.5),
-                .init(color: .red.opacity(0.7), location: 0.75),
-            ],
-            startPoint: .bottom,
-            endPoint: .top
-        )
+        switch theme {
+        case .classic:
+            return .linearGradient(
+                stops: [
+                    .init(color: ColorTheme.brandLighter.opacity(0.4), location: 0),
+                    .init(color: ColorTheme.brandLight.opacity(0.5), location: 0.25),
+                    .init(color: ColorTheme.brand.opacity(0.6), location: 0.5),
+                    .init(color: ColorTheme.brandDark.opacity(0.7), location: 0.75),
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+        case .colorful:
+            return .linearGradient(
+                stops: [
+                    .init(color: .green.opacity(0.4), location: 0),
+                    .init(color: .yellow.opacity(0.5), location: 0.25),
+                    .init(color: .orange.opacity(0.6), location: 0.5),
+                    .init(color: .red.opacity(0.7), location: 0.75),
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+        }
+    }
+
+    private var areaGradient: LinearGradient {
+        switch theme {
+        case .classic:
+            return .linearGradient(
+                stops: [
+                    .init(color: ColorTheme.brandLighter.opacity(0.05), location: 0),
+                    .init(color: ColorTheme.brandLight.opacity(0.15), location: 0.25),
+                    .init(color: ColorTheme.brand.opacity(0.2), location: 0.5),
+                    .init(color: ColorTheme.brand.opacity(0.25), location: 0.75),
+                    .init(color: ColorTheme.brandDark.opacity(0.3), location: 1.0),
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+        case .colorful:
+            return .linearGradient(
+                stops: [
+                    .init(color: .green.opacity(0.05), location: 0),
+                    .init(color: .green.opacity(0.15), location: 0.25),
+                    .init(color: .yellow.opacity(0.2), location: 0.5),
+                    .init(color: .orange.opacity(0.25), location: 0.75),
+                    .init(color: .red.opacity(0.3), location: 1.0),
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+        }
     }
 
     var body: some View {
@@ -182,19 +242,7 @@ private struct SparklineChart: View {
                     x: .value("Day", item.date, unit: .day),
                     y: .value("Peak", item.peak)
                 )
-                .foregroundStyle(
-                    .linearGradient(
-                        stops: [
-                            .init(color: .green.opacity(0.05), location: 0),
-                            .init(color: .green.opacity(0.15), location: 0.25),
-                            .init(color: .yellow.opacity(0.2), location: 0.5),
-                            .init(color: .orange.opacity(0.25), location: 0.75),
-                            .init(color: .red.opacity(0.3), location: 1.0),
-                        ],
-                        startPoint: .bottom,
-                        endPoint: .top
-                    )
-                )
+                .foregroundStyle(areaGradient)
 
                 LineMark(
                     x: .value("Day", item.date, unit: .day),

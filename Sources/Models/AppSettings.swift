@@ -1,5 +1,33 @@
 import SwiftUI
 
+/// Color theme for the app UI.
+enum ColorTheme: String, CaseIterable {
+    case classic   // Warm terracotta monochrome palette
+    case colorful  // Multi-color green/yellow/orange/red
+
+    var displayName: String {
+        switch self {
+        case .classic: return "Default"
+        case .colorful: return "Classic"
+        }
+    }
+
+    // MARK: - Classic Theme Colors
+
+    /// Primary brand color — terracotta orange (#D97757)
+    static let brand = Color(hex: 0xD97757)
+    /// Darker brand variant (#B85A3A)
+    static let brandDark = Color(hex: 0xB85A3A)
+    /// Lighter brand variant (#F0C4AE)
+    static let brandLight = Color(hex: 0xF0C4AE)
+    /// Very light brand variant (#F5D9CB)
+    static let brandLighter = Color(hex: 0xF5D9CB)
+    /// Track/background color (#E6E0D8)
+    static let trackBG = Color(hex: 0xE6E0D8)
+    /// Screen background (#FAF8F4)
+    static let background = Color(hex: 0xFAF8F4)
+}
+
 /// Display modes for menu bar text.
 enum MenuBarDisplayMode: String, CaseIterable {
     case percentageAndTime = "percentageAndTime"
@@ -27,6 +55,7 @@ class AppSettings: ObservableObject {
     @AppStorage("notifyAt95") var notifyAt95: Bool = true
 
     // Display
+    @AppStorage("colorTheme") var colorTheme: String = ColorTheme.classic.rawValue
     @AppStorage("showMenuBarIcon") var showMenuBarIcon: Bool = true
     @AppStorage("showMenuBarText") var showMenuBarText: Bool = true
     @AppStorage("menuBarDisplayMode") var menuBarDisplayMode: String = MenuBarDisplayMode.percentageAndTime.rawValue
@@ -46,5 +75,10 @@ class AppSettings: ObservableObject {
     var displayMode: MenuBarDisplayMode {
         get { MenuBarDisplayMode(rawValue: menuBarDisplayMode) ?? .percentageAndTime }
         set { menuBarDisplayMode = newValue.rawValue }
+    }
+
+    var activeTheme: ColorTheme {
+        get { ColorTheme(rawValue: colorTheme) ?? .classic }
+        set { colorTheme = newValue.rawValue }
     }
 }

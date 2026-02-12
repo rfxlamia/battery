@@ -34,10 +34,10 @@ struct ProjectionView: View {
                             } else {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .font(.caption2)
-                                    .foregroundStyle(remaining < 1800 ? .red : .orange)
+                                    .foregroundStyle(remaining < 1800 ? warningCriticalColor : warningColor)
                                 Text("Limit in \(TimeFormatting.shortDuration(remaining))")
                                     .font(.caption)
-                                    .foregroundStyle(remaining < 1800 ? .red : .primary)
+                                    .foregroundStyle(remaining < 1800 ? warningCriticalColor : .primary)
                             }
                         }
                     }
@@ -86,11 +86,30 @@ struct ProjectionView: View {
         }
     }
 
+    private var theme: ColorTheme { AppSettings.shared.activeTheme }
+
+    private var warningColor: Color {
+        theme == .classic ? ColorTheme.brand : .orange
+    }
+
+    private var warningCriticalColor: Color {
+        theme == .classic ? ColorTheme.brandDark : .red
+    }
+
     private func trendColor(_ trend: BurnRateProjection.Trend) -> Color {
-        switch trend {
-        case .increasing: return .orange
-        case .stable: return .blue
-        case .decreasing: return .green
+        switch theme {
+        case .classic:
+            switch trend {
+            case .increasing: return ColorTheme.brand
+            case .stable: return .blue
+            case .decreasing: return .green
+            }
+        case .colorful:
+            switch trend {
+            case .increasing: return .orange
+            case .stable: return .blue
+            case .decreasing: return .green
+            }
         }
     }
 

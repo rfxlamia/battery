@@ -40,6 +40,7 @@ struct SettingsView: View {
         }
         .frame(width: 320)
         .fixedSize(horizontal: false, vertical: true)
+        .background(AppSettings.shared.activeTheme == .classic ? ColorTheme.background : Color.clear)
     }
 
     // MARK: - Display
@@ -70,6 +71,26 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .font(.caption)
                 }
+            }
+
+            Divider()
+
+            // Theme
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Theme")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Picker("Theme", selection: Binding(
+                    get: { settings.activeTheme },
+                    set: { settings.activeTheme = $0 }
+                )) {
+                    ForEach(ColorTheme.allCases, id: \.self) { theme in
+                        Text(theme.displayName).tag(theme)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
 
             Divider()
