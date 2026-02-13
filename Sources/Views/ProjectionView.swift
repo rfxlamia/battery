@@ -27,7 +27,7 @@ struct ProjectionView: View {
                             if limitAfterReset {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption2)
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(safeColor)
                                 Text("Limit in \(TimeFormatting.shortDuration(remaining)) (after reset)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -88,6 +88,10 @@ struct ProjectionView: View {
 
     private var theme: ColorTheme { AppSettings.shared.activeTheme }
 
+    private var safeColor: Color {
+        theme == .default ? ColorTheme.brandLight : .green
+    }
+
     private var warningColor: Color {
         theme == .default ? ColorTheme.brand : .orange
     }
@@ -100,9 +104,9 @@ struct ProjectionView: View {
         switch theme {
         case .default:
             switch trend {
-            case .increasing: return ColorTheme.brand
-            case .stable: return .blue
-            case .decreasing: return .green
+            case .increasing: return ColorTheme.brandDark
+            case .stable: return ColorTheme.brand
+            case .decreasing: return ColorTheme.brandLight
             }
         case .classic:
             switch trend {

@@ -11,6 +11,7 @@ struct UsageSnapshot: Codable, Identifiable {
     let sonnetUtilization: Double?
     let opusUtilization: Double?
     let planTier: String
+    let accountId: UUID?
 
     init(
         id: UUID = UUID(),
@@ -21,7 +22,8 @@ struct UsageSnapshot: Codable, Identifiable {
         weeklyResetsAt: Date,
         sonnetUtilization: Double? = nil,
         opusUtilization: Double? = nil,
-        planTier: String = "unknown"
+        planTier: String = "unknown",
+        accountId: UUID? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -32,5 +34,6 @@ struct UsageSnapshot: Codable, Identifiable {
         self.sonnetUtilization = sonnetUtilization
         self.opusUtilization = opusUtilization
         self.planTier = planTier
+        self.accountId = accountId
     }
 }

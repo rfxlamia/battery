@@ -93,6 +93,12 @@ if [[ -f "$PROJECT_DIR/Resources/AppIcon.icns" ]]; then
     echo "    Copied AppIcon.icns"
 fi
 
+# Copy Battery icon PNG (used in LoginView)
+if [[ -f "$PROJECT_DIR/Resources/BatteryIcon.png" ]]; then
+    cp "$PROJECT_DIR/Resources/BatteryIcon.png" "$APP_BUNDLE/Contents/Resources/BatteryIcon.png"
+    echo "    Copied BatteryIcon.png"
+fi
+
 # Copy CLI launcher
 cp "$PROJECT_DIR/Scripts/claude-battery" "$APP_BUNDLE/Contents/Resources/claude-battery"
 chmod +x "$APP_BUNDLE/Contents/Resources/claude-battery"

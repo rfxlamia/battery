@@ -1,11 +1,15 @@
 import SwiftUI
 
-/// Full settings panel with display, notification, polling, data, general, and about sections.
+/// Full settings panel with accounts, display, notification, polling, data, general, and about sections.
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject var settings = AppSettings.shared
     @ObservedObject var updaterService: UpdaterService
+    @ObservedObject var usageViewModel: UsageViewModel
     var onClose: () -> Void
+
+    @State private var renamingAccountId: UUID?
+    @State private var renameText: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,6 +23,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -28,6 +33,7 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(spacing: 16) {
+                    accountsSection
                     displaySection
                     notificationsSection
                     pollingSection
@@ -41,6 +47,94 @@ struct SettingsView: View {
         .frame(width: 320)
         .fixedSize(horizontal: false, vertical: true)
         .background(AppSettings.shared.activeTheme == .default ? ColorTheme.background : ColorTheme.classicBackground)
+    }
+
+    // MARK: - Accounts
+
+    private var accountsSection: some View {
+        SettingsSection(title: "Accounts", icon: "person.2") {
+            ForEach(usageViewModel.accounts) { account in
+                HStack(spacing: 8) {
+                    if renamingAccountId == account.id {
+                        TextField("Name", text: $renameText, onCommit: {
+                            let trimmed = renameText.trimmingCharacters(in: .whitespaces)
+                            if !trimmed.isEmpty {
+                                usageViewModel.renameAccount(id: account.id, newName: trimmed)
+                            }
+                            renamingAccountId = nil
+                        })
+                        .font(.caption)
+                        .textFieldStyle(.roundedBorder)
+                    } else {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(account.name)
+                                .font(.caption)
+                                .fontWeight(account.id == usageViewModel.selectedAccountId ? .semibold : .regular)
+                            if let email = account.email {
+                                Text(email)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+
+                    Spacer()
+
+                    Button(action: {
+                        renameText = account.name
+                        renamingAccountId = account.id
+                    }) {
+                        Image(systemName: "pencil")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .focusable(false)
+                    .help("Rename account")
+
+                    Button(action: { usageViewModel.removeAccount(id: account.id) }) {
+                        Image(systemName: "trash")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .focusable(false)
+                    .help("Remove account")
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    usageViewModel.selectAccount(id: account.id)
+                }
+            }
+
+            if usageViewModel.accounts.count < 5 {
+                HStack {
+                    Button("Add Account") {
+                        NSApp.keyWindow?.close()
+                        usageViewModel.startOAuthLogin { success in
+                            if success { onClose() }
+                        }
+                    }
+                    .font(.caption)
+                    .controlSize(.small)
+                    .focusable(false)
+                    Spacer()
+                }
+            }
+
+            if !usageViewModel.accounts.isEmpty {
+                Divider()
+                HStack {
+                    Button("Sign Out of All Accounts") {
+                        usageViewModel.removeAllAccounts()
+                    }
+                    .font(.caption)
+                    .controlSize(.small)
+                    .focusable(false)
+                    Spacer()
+                }
+            }
+        }
     }
 
     // MARK: - Display
@@ -142,6 +236,7 @@ struct SettingsView: View {
                     }
                     .font(.caption)
                     .controlSize(.small)
+                    .focusable(false)
                 }
             }
 
@@ -159,6 +254,7 @@ struct SettingsView: View {
                 }
                 .font(.caption)
                 .controlSize(.small)
+                .focusable(false)
             }
         }
     }
@@ -232,6 +328,7 @@ struct SettingsView: View {
                 }
                 .font(.caption)
                 .controlSize(.small)
+                .focusable(false)
 
                 Spacer()
 
@@ -240,6 +337,7 @@ struct SettingsView: View {
                 }
                 .font(.caption)
                 .controlSize(.small)
+                .focusable(false)
             }
         }
     }
@@ -282,6 +380,7 @@ struct SettingsView: View {
                 }
                 .font(.caption)
                 .controlSize(.small)
+                .focusable(false)
                 .disabled(!updaterService.canCheckForUpdates)
             }
         }

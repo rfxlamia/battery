@@ -7,15 +7,34 @@ struct PopoverView: View {
     @State private var showSettings = false
 
     var body: some View {
-        if showSettings {
-            SettingsView(updaterService: updaterService, onClose: { showSettings = false })
-        } else {
-            mainContent
+        Group {
+            if showSettings {
+                SettingsView(updaterService: updaterService, usageViewModel: viewModel, onClose: { showSettings = false })
+            } else if viewModel.needsLogin {
+                LoginView(viewModel: viewModel)
+            } else {
+                mainContent
+            }
         }
+        .animation(.none, value: showSettings)
+        .animation(.none, value: viewModel.needsLogin)
     }
 
     private var mainContent: some View {
         VStack(spacing: 16) {
+            // Account tabs (only when multiple accounts)
+            if viewModel.accounts.count > 1 {
+                AccountTabsView(
+                    accounts: viewModel.accounts,
+                    selectedAccountId: viewModel.selectedAccountId,
+                    onSelect: { viewModel.selectAccount(id: $0) },
+                    onAddAccount: {
+                        NSApp.keyWindow?.close()
+                        viewModel.startOAuthLogin { _ in }
+                    }
+                )
+            }
+
             // Header
             HStack {
                 Text("Battery")
@@ -161,6 +180,7 @@ struct PopoverView: View {
             }
         }
         .padding(16)
+        .animation(.none, value: viewModel.selectedAccountId)
         .background(AppSettings.shared.activeTheme == .default ? ColorTheme.background : ColorTheme.classicBackground)
     }
 }

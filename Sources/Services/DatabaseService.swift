@@ -2,7 +2,6 @@ import Foundation
 import SQLite
 
 /// SQLite-backed persistence for usage history snapshots.
-/// Phase 2: Full implementation with schema, CRUD, and pruning.
 actor DatabaseService {
 
     private var db: Connection?
@@ -18,6 +17,7 @@ actor DatabaseService {
     private let colSonnetUtil = SQLite.Expression<Double?>("sonnet_utilization")
     private let colOpusUtil = SQLite.Expression<Double?>("opus_utilization")
     private let colPlanTier = SQLite.Expression<String>("plan_tier")
+    private let colAccountId = SQLite.Expression<String?>("account_id")
 
     func initialize() throws {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -44,6 +44,9 @@ actor DatabaseService {
 
         // Create index on timestamp for efficient range queries
         try db?.run(snapshots.createIndex(colTimestamp, ifNotExists: true))
+
+        // Migration: add account_id column if missing
+        migrateAddAccountId()
     }
 
     func saveSnapshot(_ snapshot: UsageSnapshot) throws {
@@ -57,15 +60,20 @@ actor DatabaseService {
             colWeeklyResets <- snapshot.weeklyResetsAt.timeIntervalSince1970,
             colSonnetUtil <- snapshot.sonnetUtilization,
             colOpusUtil <- snapshot.opusUtilization,
-            colPlanTier <- snapshot.planTier
+            colPlanTier <- snapshot.planTier,
+            colAccountId <- snapshot.accountId?.uuidString
         ))
     }
 
-    func getSnapshots(from startDate: Date, to endDate: Date) throws -> [UsageSnapshot] {
+    func getSnapshots(from startDate: Date, to endDate: Date, accountId: UUID? = nil) throws -> [UsageSnapshot] {
         guard let db = db else { return [] }
-        let query = snapshots
+        var query = snapshots
             .filter(colTimestamp >= startDate.timeIntervalSince1970 && colTimestamp <= endDate.timeIntervalSince1970)
             .order(colTimestamp.asc)
+
+        if let accountId = accountId {
+            query = query.filter(colAccountId == accountId.uuidString)
+        }
 
         return try db.prepare(query).map { row in
             UsageSnapshot(
@@ -77,16 +85,21 @@ actor DatabaseService {
                 weeklyResetsAt: Date(timeIntervalSince1970: row[colWeeklyResets]),
                 sonnetUtilization: row[colSonnetUtil],
                 opusUtilization: row[colOpusUtil],
-                planTier: row[colPlanTier]
+                planTier: row[colPlanTier],
+                accountId: row[colAccountId].flatMap { UUID(uuidString: $0) }
             )
         }
     }
 
-    func getLatestSnapshots(count: Int) throws -> [UsageSnapshot] {
+    func getLatestSnapshots(count: Int, accountId: UUID? = nil) throws -> [UsageSnapshot] {
         guard let db = db else { return [] }
-        let query = snapshots
+        var query = snapshots
             .order(colTimestamp.desc)
             .limit(count)
+
+        if let accountId = accountId {
+            query = query.filter(colAccountId == accountId.uuidString)
+        }
 
         return try db.prepare(query).map { row in
             UsageSnapshot(
@@ -98,7 +111,8 @@ actor DatabaseService {
                 weeklyResetsAt: Date(timeIntervalSince1970: row[colWeeklyResets]),
                 sonnetUtilization: row[colSonnetUtil],
                 opusUtilization: row[colOpusUtil],
-                planTier: row[colPlanTier]
+                planTier: row[colPlanTier],
+                accountId: row[colAccountId].flatMap { UUID(uuidString: $0) }
             )
         }.reversed()  // Return in chronological order
     }
@@ -109,4 +123,19 @@ actor DatabaseService {
         try db.run(old.delete())
     }
 
+    // MARK: - Migration
+
+    private func migrateAddAccountId() {
+        guard let db = db else { return }
+        // Check if column exists by trying a query; if it fails, add the column
+        do {
+            _ = try db.scalar(snapshots.select(colAccountId).limit(1))
+        } catch {
+            do {
+                try db.run(snapshots.addColumn(colAccountId))
+            } catch {
+                print("Migration: account_id column may already exist: \(error.localizedDescription)")
+            }
+        }
+    }
 }

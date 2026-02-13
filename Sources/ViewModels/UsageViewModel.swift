@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 
 /// Main view model that coordinates all services and provides state to views.
+@MainActor
 class UsageViewModel: ObservableObject {
     // MARK: - Published State
 
@@ -20,21 +21,28 @@ class UsageViewModel: ObservableObject {
     @Published var error: String?
     @Published var planTier: PlanTier = .unknown
 
-    // Phase 2: Projections and history
+    // Projections and history
     @Published var projection: BurnRateProjection?
     @Published var dailyPeaks: [(date: Date, peak: Double)] = []
 
-    // Phase 3: Streaks and stats
+    // Streaks and stats
     @Published var currentStreak: Int = 0
-    @Published var activeDays: [Date: Double] = [:]  // last 30 days heat map
+    @Published var activeDays: [Date: Double] = [:]
     @Published var todaySessionCount: Int = 0
 
-    // Phase 3: Hook-driven session awareness
+    // Hook-driven session awareness
     @Published var isSessionActive: Bool = false
     @Published var currentSessionStart: Date?
 
+    // Multi-account state
+    @Published var accounts: [Account] = []
+    @Published var selectedAccountId: UUID?
+    @Published var needsLogin: Bool = true
+
     // MARK: - Services
 
+    let accountManager = AccountManager()
+    let oauthService = OAuthService()
     private let pollingService = UsagePollingService()
     private let databaseService = DatabaseService()
     private let notificationService = NotificationService()
@@ -44,6 +52,9 @@ class UsageViewModel: ObservableObject {
     private var dbInitialized = false
     private var todayPeakSeen: Double = 0
     private var todayPeakDate: Date = Calendar.current.startOfDay(for: Date())
+
+    // Per-account usage state cache
+    private var accountUsageStates: [UUID: AccountUsageState] = [:]
 
     // MARK: - Computed Properties
 
@@ -104,9 +115,18 @@ class UsageViewModel: ObservableObject {
         setupBindings()
         initializeDatabase()
         notificationService.requestPermission()
-        pollingService.startPolling()
         hookWatcher.startWatching()
         statsCacheService.startWatching()
+
+        // Load accounts and start polling if we have any
+        accountManager.load()
+        setupAccountBindings()
+
+        if accountManager.hasAccounts {
+            needsLogin = false
+            configurePollingForSelectedAccount()
+            pollingService.startPolling()
+        }
     }
 
     deinit {
@@ -121,7 +141,168 @@ class UsageViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Account Management
+
+    func startOAuthLogin(completion: ((Bool) -> Void)? = nil) {
+        oauthService.startLogin { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .success(let tokenPair):
+                let accountNumber = self.accounts.count + 1
+                let account = Account(
+                    name: "Account \(accountNumber)",
+                    planTier: .unknown,
+                    isDefault: self.accounts.isEmpty
+                )
+                let tokens = StoredTokens(
+                    accessToken: tokenPair.accessToken,
+                    refreshToken: tokenPair.refreshToken,
+                    expiresIn: tokenPair.expiresIn
+                )
+                self.accountManager.addAccount(account, tokens: tokens)
+                self.needsLogin = false
+                self.configurePollingForSelectedAccount()
+
+                if !self.pollingService.isPolling {
+                    self.pollingService.startPolling()
+                } else {
+                    Task { await self.pollingService.pollNow() }
+                }
+                completion?(true)
+
+            case .failure(let error):
+                self.error = error.localizedDescription
+                completion?(false)
+            }
+        }
+    }
+
+    func selectAccount(id: UUID) {
+        guard id != selectedAccountId else { return }
+
+        // Cache current account's state
+        if let oldId = selectedAccountId {
+            accountUsageStates[oldId] = captureCurrentState()
+        }
+
+        accountManager.selectAccount(id: id)
+
+        // Restore cached state for new account (keep current view if no cache yet)
+        if let cached = accountUsageStates[id] {
+            withAnimation(.none) {
+                restoreState(cached)
+            }
+        }
+
+        // Reconfigure polling with new account's tokens
+        configurePollingForSelectedAccount()
+        Task { await pollingService.pollNow() }
+    }
+
+    func removeAccount(id: UUID) {
+        accountUsageStates.removeValue(forKey: id)
+        accountManager.removeAccount(id: id)
+
+        if accountManager.hasAccounts {
+            configurePollingForSelectedAccount()
+            Task { await pollingService.pollNow() }
+        } else {
+            pollingService.stopPolling()
+            needsLogin = true
+            restoreState(AccountUsageState())
+        }
+    }
+
+    func renameAccount(id: UUID, newName: String) {
+        guard var account = accounts.first(where: { $0.id == id }) else { return }
+        account.name = newName
+        accountManager.updateAccount(account)
+    }
+
+    func removeAllAccounts() {
+        accountUsageStates.removeAll()
+        accountManager.removeAllAccounts()
+        pollingService.stopPolling()
+        needsLogin = true
+        restoreState(AccountUsageState())
+    }
+
+    // MARK: - Private: Account State
+
+    private func setupAccountBindings() {
+        accountManager.$accounts
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$accounts)
+
+        accountManager.$selectedAccountId
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$selectedAccountId)
+
+        pollingService.$needsReauth
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] needsReauth in
+                guard let self = self, needsReauth else { return }
+                self.notificationService.notifyTokenRefreshFailure()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func configurePollingForSelectedAccount() {
+        guard let account = accountManager.selectedAccount else { return }
+        let tokens = accountManager.getTokens(for: account.id)
+        pollingService.configure(tokens: tokens) { [weak self] updatedTokens in
+            guard let self = self, let account = self.accountManager.selectedAccount else { return }
+            self.accountManager.saveTokens(updatedTokens, for: account.id)
+        }
+    }
+
+    private func captureCurrentState() -> AccountUsageState {
+        var state = AccountUsageState()
+        state.sessionUtilization = sessionUtilization
+        state.sessionResetsAt = sessionResetsAt
+        state.weeklyUtilization = weeklyUtilization
+        state.weeklyResetsAt = weeklyResetsAt
+        state.sonnetUtilization = sonnetUtilization
+        state.opusUtilization = opusUtilization
+        state.extraUsageEnabled = extraUsageEnabled
+        state.extraUsageCost = extraUsageCost
+        state.extraUsageLimit = extraUsageLimit
+        state.extraUsageUtilization = extraUsageUtilization
+        state.isConnected = isConnected
+        state.lastUpdated = lastUpdated
+        state.error = error
+        state.planTier = planTier
+        state.projection = projection
+        state.dailyPeaks = dailyPeaks
+        state.currentStreak = currentStreak
+        state.activeDays = activeDays
+        state.todaySessionCount = todaySessionCount
+        return state
+    }
+
+    private func restoreState(_ state: AccountUsageState) {
+        sessionUtilization = state.sessionUtilization
+        sessionResetsAt = state.sessionResetsAt
+        weeklyUtilization = state.weeklyUtilization
+        weeklyResetsAt = state.weeklyResetsAt
+        sonnetUtilization = state.sonnetUtilization
+        opusUtilization = state.opusUtilization
+        extraUsageEnabled = state.extraUsageEnabled
+        extraUsageCost = state.extraUsageCost
+        extraUsageLimit = state.extraUsageLimit
+        extraUsageUtilization = state.extraUsageUtilization
+        isConnected = state.isConnected
+        lastUpdated = state.lastUpdated
+        error = state.error
+        planTier = state.planTier
+        projection = state.projection
+        dailyPeaks = state.dailyPeaks
+        currentStreak = state.currentStreak
+        activeDays = state.activeDays
+        todaySessionCount = state.todaySessionCount
+    }
+
+    // MARK: - Private: Database
 
     private func initializeDatabase() {
         Task {
@@ -210,6 +391,7 @@ class UsageViewModel: ObservableObject {
     }
 
     private func updateFromUsage(_ usage: UsageResponse) {
+        guard !needsLogin else { return }
         sessionUtilization = usage.fiveHour?.utilization ?? 0
         sessionResetsAt = usage.fiveHour?.resetsAtDate
         weeklyUtilization = usage.sevenDay.utilization
@@ -262,7 +444,8 @@ class UsageViewModel: ObservableObject {
             weeklyResetsAt: usage.sevenDay.resetsAtDate ?? Date(),
             sonnetUtilization: usage.sevenDaySonnet?.utilization,
             opusUtilization: usage.sevenDayOpus?.utilization,
-            planTier: planTier.rawValue
+            planTier: planTier.rawValue,
+            accountId: selectedAccountId
         )
 
         do {
@@ -273,7 +456,7 @@ class UsageViewModel: ObservableObject {
 
         // Compute projections from recent snapshots
         do {
-            let recentSnapshots = try await databaseService.getLatestSnapshots(count: 20)
+            let recentSnapshots = try await databaseService.getLatestSnapshots(count: 20, accountId: selectedAccountId)
             guard let resetsAt = fiveHour.resetsAtDate else { return }
 
             let proj = BurnRateCalculator.calculate(
@@ -302,8 +485,6 @@ class UsageViewModel: ObservableObject {
 
     // MARK: - Today Injection
 
-    /// If stats-cache.json hasn't been updated for today yet, inject the day's
-    /// peak utilization so the heatmap shows today as active.
     private func injectTodayActivity(into days: [Date: Double]) -> [Date: Double] {
         let today = Calendar.current.startOfDay(for: Date())
         guard days[today] == nil, isConnected, todayPeakSeen > 0 else { return days }
@@ -312,8 +493,6 @@ class UsageViewModel: ObservableObject {
         return merged
     }
 
-    /// If stats-cache.json hasn't been updated for today yet, append the day's
-    /// peak utilization so the sparkline includes today.
     private func injectTodayPeak(into peaks: [(date: Date, peak: Double)]) -> [(date: Date, peak: Double)] {
         let today = Calendar.current.startOfDay(for: Date())
         guard !peaks.contains(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) else { return peaks }

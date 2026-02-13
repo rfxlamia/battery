@@ -6,15 +6,24 @@ class UsagePollingService: ObservableObject {
     @Published var latestUsage: UsageResponse?
     @Published var lastError: Error?
     @Published var isPolling: Bool = false
+    @Published var needsReauth: Bool = false
 
-    private let keychainService = KeychainService()
     private let tokenRefreshService = TokenRefreshService()
     private let api = AnthropicAPI()
     private var pollingTask: Task<Void, Never>?
     private var currentInterval: TimeInterval
+    private var currentTokens: StoredTokens?
+    private var onTokensRefreshed: ((StoredTokens) -> Void)?
 
     init(interval: TimeInterval = Constants.defaultPollInterval) {
         self.currentInterval = interval
+    }
+
+    /// Configure the polling service with tokens and a callback for when tokens are refreshed.
+    func configure(tokens: StoredTokens?, onTokensRefreshed: @escaping (StoredTokens) -> Void) {
+        self.currentTokens = tokens
+        self.onTokensRefreshed = onTokensRefreshed
+        self.needsReauth = (tokens == nil)
     }
 
     func startPolling() {
@@ -45,63 +54,59 @@ class UsagePollingService: ObservableObject {
 
     @MainActor
     func pollNow() async {
+        guard let tokens = currentTokens else {
+            needsReauth = true
+            return
+        }
+
         do {
-            let credentials = try await keychainService.readCredentials()
-            let token = try await tokenRefreshService.refreshIfNeeded(
-                credentials: credentials,
-                keychainService: keychainService
-            )
-            let usage = try await api.fetchUsage(accessToken: token)
+            let (accessToken, updatedTokens) = try await tokenRefreshService.refreshIfNeeded(tokens: tokens)
+
+            if let updated = updatedTokens {
+                currentTokens = updated
+                onTokensRefreshed?(updated)
+            }
+
+            let usage = try await api.fetchUsage(accessToken: accessToken)
             self.latestUsage = usage
             self.lastError = nil
+            self.needsReauth = false
         } catch {
             self.lastError = error
-            // On 401 or token refresh failure, try recovery
+
+            // On 401 or token refresh failure, try force refresh
             if let apiError = error as? AnthropicAPI.APIError, apiError.isUnauthorized {
-                await retryWithRefresh()
+                await retryWithForceRefresh()
             } else if error is TokenRefreshService.TokenError {
-                await retryWithRefresh()
+                self.needsReauth = true
             }
         }
     }
 
     @MainActor
-    private func retryWithRefresh() async {
-        do {
-            // Try OAuth refresh using Battery's cached credentials (no password prompt)
-            let credentials = try await keychainService.readCredentials(forceRefresh: true)
-            let tokenResponse = try await tokenRefreshService.forceRefresh(refreshToken: credentials.refreshToken)
-            let updated = KeychainService.Credentials(
-                accessToken: tokenResponse.accessToken,
-                refreshToken: tokenResponse.refreshToken ?? credentials.refreshToken,
-                expiresAt: Date().addingTimeInterval(TimeInterval(tokenResponse.expiresIn)),
-                subscriptionType: credentials.subscriptionType,
-                rateLimitTier: credentials.rateLimitTier
-            )
-            await keychainService.updateCachedCredentials(updated)
-            let usage = try await api.fetchUsage(accessToken: tokenResponse.accessToken)
-            self.latestUsage = usage
-            self.lastError = nil
-        } catch {
-            // OAuth refresh failed (e.g. refresh token expired) — last resort:
-            // read from Claude Code's keychain (may prompt once)
-            await retryFromClaudeCodeKeychain()
+    private func retryWithForceRefresh() async {
+        guard let tokens = currentTokens, let refreshToken = tokens.refreshToken else {
+            needsReauth = true
+            return
         }
-    }
 
-    @MainActor
-    private func retryFromClaudeCodeKeychain() async {
         do {
-            let credentials = try await keychainService.readFromClaudeCodeAndCache()
-            let token = try await tokenRefreshService.refreshIfNeeded(
-                credentials: credentials,
-                keychainService: keychainService
+            let response = try await tokenRefreshService.forceRefresh(refreshToken: refreshToken)
+            let updated = StoredTokens(
+                accessToken: response.accessToken,
+                refreshToken: response.refreshToken ?? tokens.refreshToken,
+                expiresIn: response.expiresIn
             )
-            let usage = try await api.fetchUsage(accessToken: token)
+            currentTokens = updated
+            onTokensRefreshed?(updated)
+
+            let usage = try await api.fetchUsage(accessToken: response.accessToken)
             self.latestUsage = usage
             self.lastError = nil
+            self.needsReauth = false
         } catch {
             self.lastError = error
+            self.needsReauth = true
         }
     }
 }

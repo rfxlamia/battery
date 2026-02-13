@@ -69,7 +69,7 @@ class NotificationService {
     func notifyTokenRefreshFailure() {
         sendNotification(
             title: "Credentials Need Attention",
-            body: "Battery couldn't refresh your Claude Code token. You may need to re-sign in with 'claude'."
+            body: "Battery couldn't refresh your token. Please sign in again from Battery."
         )
     }
 

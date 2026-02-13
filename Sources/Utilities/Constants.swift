@@ -3,9 +3,15 @@ import Foundation
 /// App-wide constants.
 enum Constants {
     static let apiBaseURL = "https://api.anthropic.com"
-    static let tokenRefreshURL = "https://platform.claude.com/v1/oauth/token"
-    static let keychainService = "Claude Code-credentials"
     static let betaHeader = "oauth-2025-04-20"
+
+    // OAuth PKCE
+    static let oauthClientId = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+    static let oauthAuthorizeURL = "https://claude.ai/oauth/authorize"
+    static let oauthTokenURL = "https://platform.claude.com/v1/oauth/token"
+    static let oauthScopes = "user:profile user:inference"
+    static let oauthRedirectPath = "/callback"
+    static let userAgent = "claude-code/2.0.32"
 
     // Polling intervals (seconds)
     static let defaultPollInterval: TimeInterval = 60

@@ -20,6 +20,7 @@ actor TokenRefreshService {
     enum TokenError: LocalizedError {
         case refreshFailed(statusCode: Int, body: String)
         case networkError(Error)
+        case noRefreshToken
 
         var errorDescription: String? {
             switch self {
@@ -27,6 +28,8 @@ actor TokenRefreshService {
                 return "Token refresh failed (HTTP \(code)): \(body)"
             case .networkError(let error):
                 return "Network error during token refresh: \(error.localizedDescription)"
+            case .noRefreshToken:
+                return "No refresh token available"
             }
         }
     }
@@ -34,38 +37,39 @@ actor TokenRefreshService {
     private let refreshBufferSeconds: TimeInterval = 300 // 5 minutes
 
     /// Returns a valid access token, refreshing if needed.
-    /// When a refresh occurs, the updated credentials are persisted via `keychainService`.
-    func refreshIfNeeded(
-        credentials: KeychainService.Credentials,
-        keychainService: KeychainService
-    ) async throws -> String {
-        if credentials.expiresAt.timeIntervalSinceNow > refreshBufferSeconds {
-            return credentials.accessToken
+    /// Returns optional updated tokens (nil if no refresh was needed).
+    func refreshIfNeeded(tokens: StoredTokens) async throws -> (accessToken: String, updatedTokens: StoredTokens?) {
+        if tokens.expiryDate.timeIntervalSinceNow > refreshBufferSeconds {
+            return (tokens.accessToken, nil)
         }
-        let response = try await forceRefresh(refreshToken: credentials.refreshToken)
-        let updated = KeychainService.Credentials(
+
+        guard let refreshToken = tokens.refreshToken else {
+            throw TokenError.noRefreshToken
+        }
+
+        let response = try await forceRefresh(refreshToken: refreshToken)
+        let updated = StoredTokens(
             accessToken: response.accessToken,
-            refreshToken: response.refreshToken ?? credentials.refreshToken,
-            expiresAt: Date().addingTimeInterval(TimeInterval(response.expiresIn)),
-            subscriptionType: credentials.subscriptionType,
-            rateLimitTier: credentials.rateLimitTier
+            refreshToken: response.refreshToken ?? tokens.refreshToken,
+            expiresIn: response.expiresIn
         )
-        await keychainService.updateCachedCredentials(updated)
-        return response.accessToken
+        return (response.accessToken, updated)
     }
 
     /// Force a token refresh using the refresh token.
     func forceRefresh(refreshToken: String) async throws -> TokenResponse {
-        var request = URLRequest(url: URL(string: Constants.tokenRefreshURL)!)
+        var request = URLRequest(url: URL(string: Constants.oauthTokenURL)!)
         request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(Constants.userAgent, forHTTPHeaderField: "User-Agent")
 
-        var components = URLComponents()
-        components.queryItems = [
-            URLQueryItem(name: "grant_type", value: "refresh_token"),
-            URLQueryItem(name: "refresh_token", value: refreshToken),
+        let body: [String: String] = [
+            "grant_type": "refresh_token",
+            "refresh_token": refreshToken,
+            "client_id": Constants.oauthClientId,
+            "scope": Constants.oauthScopes,
         ]
-        request.httpBody = components.percentEncodedQuery?.data(using: .utf8)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)

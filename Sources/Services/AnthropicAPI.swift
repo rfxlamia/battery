@@ -40,6 +40,7 @@ actor AnthropicAPI {
         request.httpMethod = "GET"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue(Constants.betaHeader, forHTTPHeaderField: "anthropic-beta")
+        request.setValue(Constants.userAgent, forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 15
 
         do {
