@@ -75,20 +75,7 @@ actor DatabaseService {
             query = query.filter(colAccountId == accountId.uuidString)
         }
 
-        return try db.prepare(query).map { row in
-            UsageSnapshot(
-                id: UUID(uuidString: row[colId]) ?? UUID(),
-                timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
-                sessionUtilization: row[colSessionUtil],
-                sessionResetsAt: Date(timeIntervalSince1970: row[colSessionResets]),
-                weeklyUtilization: row[colWeeklyUtil],
-                weeklyResetsAt: Date(timeIntervalSince1970: row[colWeeklyResets]),
-                sonnetUtilization: row[colSonnetUtil],
-                opusUtilization: row[colOpusUtil],
-                planTier: row[colPlanTier],
-                accountId: row[colAccountId].flatMap { UUID(uuidString: $0) }
-            )
-        }
+        return try db.prepare(query).map { snapshotFromRow($0) }
     }
 
     func getLatestSnapshots(count: Int, accountId: UUID? = nil) throws -> [UsageSnapshot] {
@@ -101,20 +88,22 @@ actor DatabaseService {
             query = query.filter(colAccountId == accountId.uuidString)
         }
 
-        return try db.prepare(query).map { row in
-            UsageSnapshot(
-                id: UUID(uuidString: row[colId]) ?? UUID(),
-                timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
-                sessionUtilization: row[colSessionUtil],
-                sessionResetsAt: Date(timeIntervalSince1970: row[colSessionResets]),
-                weeklyUtilization: row[colWeeklyUtil],
-                weeklyResetsAt: Date(timeIntervalSince1970: row[colWeeklyResets]),
-                sonnetUtilization: row[colSonnetUtil],
-                opusUtilization: row[colOpusUtil],
-                planTier: row[colPlanTier],
-                accountId: row[colAccountId].flatMap { UUID(uuidString: $0) }
-            )
-        }.reversed()  // Return in chronological order
+        return try db.prepare(query).map { snapshotFromRow($0) }.reversed()  // Return in chronological order
+    }
+
+    private func snapshotFromRow(_ row: Row) -> UsageSnapshot {
+        UsageSnapshot(
+            id: UUID(uuidString: row[colId]) ?? UUID(),
+            timestamp: Date(timeIntervalSince1970: row[colTimestamp]),
+            sessionUtilization: row[colSessionUtil],
+            sessionResetsAt: Date(timeIntervalSince1970: row[colSessionResets]),
+            weeklyUtilization: row[colWeeklyUtil],
+            weeklyResetsAt: Date(timeIntervalSince1970: row[colWeeklyResets]),
+            sonnetUtilization: row[colSonnetUtil],
+            opusUtilization: row[colOpusUtil],
+            planTier: row[colPlanTier],
+            accountId: row[colAccountId].flatMap { UUID(uuidString: $0) }
+        )
     }
 
     func pruneOldData(olderThan date: Date) throws {

@@ -30,20 +30,7 @@ struct ExtraUsageView: View {
             }
 
             if let used = usedDollars, let limit = limitDollars, limit > 0 {
-                // Progress bar
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(.quaternary)
-                            .frame(height: 6)
-
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(barColor)
-                            .frame(width: geometry.size.width * min(used / limit, 1.0), height: 6)
-                            .animation(.easeInOut(duration: 0.5), value: used)
-                    }
-                }
-                .frame(height: 6)
+                ProgressBarView(value: used / limit, color: barColor)
 
                 HStack {
                     Text(String(format: "$%.2f / $%.2f", used, limit))

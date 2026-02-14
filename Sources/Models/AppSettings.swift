@@ -33,6 +33,27 @@ enum ColorTheme: String, CaseIterable {
                 : NSColor(white: 1, alpha: 0.5)
         }
     ))
+    /// Returns a color for a 4-tier intensity value (0-100).
+    func intensityColor(for value: Double) -> Color {
+        switch self {
+        case .default:
+            if value >= 75 { return Self.brandDark }
+            if value >= 50 { return Self.brand }
+            if value >= 25 { return Self.brandLight }
+            return Self.brandLighter
+        case .classic:
+            if value >= 75 { return .red }
+            if value >= 50 { return .orange }
+            if value >= 25 { return .yellow }
+            return .green
+        }
+    }
+
+    /// The appropriate popover background for this theme.
+    var popoverBackground: Color {
+        self == .default ? Self.background : Self.classicBackground
+    }
+
     /// Screen background — light: #FAF8F4, dark: #191814 (slightly transparent)
     static let background = Color(nsColor: NSColor(
         name: nil,
@@ -96,5 +117,17 @@ class AppSettings: ObservableObject {
     var activeTheme: ColorTheme {
         get { ColorTheme(rawValue: colorTheme) ?? .default }
         set { colorTheme = newValue.rawValue }
+    }
+
+    /// Display percentage accounting for the "remaining" preference.
+    func displayPercentage(for utilization: Double) -> Int {
+        showPercentageRemaining
+            ? Int(max(0, 100 - utilization))
+            : Int(utilization)
+    }
+
+    /// "left" or "used" suffix matching the percentage display preference.
+    var percentageSuffix: String {
+        showPercentageRemaining ? "left" : "used"
     }
 }

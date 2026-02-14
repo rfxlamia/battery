@@ -9,12 +9,6 @@ struct SessionGaugeView: View {
 
     private var settings: AppSettings { .shared }
 
-    private var displayPercentage: Int {
-        settings.showPercentageRemaining
-            ? Int(max(0, 100 - utilization))
-            : Int(utilization)
-    }
-
     var body: some View {
         HStack(spacing: 16) {
             // Circular gauge
@@ -30,12 +24,12 @@ struct SessionGaugeView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(displayPercentage)%")
+                    Text("\(settings.displayPercentage(for: utilization))%")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundStyle(color)
                         .monospacedDigit()
-                    Text(settings.showPercentageRemaining ? "left" : "used")
+                    Text(settings.percentageSuffix)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }

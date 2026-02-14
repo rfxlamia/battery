@@ -40,17 +40,10 @@ class SettingsViewModel: ObservableObject {
     }
 
     func sendTestNotification() {
-        let content = UNMutableNotificationContent()
-        content.title = "Battery Test"
-        content.body = "Notifications are working correctly."
-        content.sound = .default
-
-        let request = UNNotificationRequest(
-            identifier: "battery-test-\(UUID().uuidString)",
-            content: content,
-            trigger: nil
+        NotificationService().sendNotification(
+            title: "Battery Test",
+            body: "Notifications are working correctly."
         )
-        UNUserNotificationCenter.current().add(request)
     }
 
     func openNotificationSettings() {

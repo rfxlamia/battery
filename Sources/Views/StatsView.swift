@@ -113,18 +113,10 @@ private struct HeatMapView: View {
 
     private func heatColor(for peak: Double?) -> Color {
         guard let peak = peak else { return Color.primary.opacity(0.05) }
-        switch AppSettings.shared.activeTheme {
-        case .default:
-            if peak >= 75 { return ColorTheme.brandDark.opacity(0.8) }
-            if peak >= 50 { return ColorTheme.brand.opacity(0.7) }
-            if peak >= 25 { return ColorTheme.brandLight.opacity(0.7) }
-            return ColorTheme.brandLighter.opacity(0.6)
-        case .classic:
-            if peak >= 75 { return .red.opacity(0.7) }
-            if peak >= 50 { return .orange.opacity(0.6) }
-            if peak >= 25 { return .yellow.opacity(0.5) }
-            return .green.opacity(0.4)
-        }
+        let theme = AppSettings.shared.activeTheme
+        let opacities: [Double] = theme == .default ? [0.8, 0.7, 0.7, 0.6] : [0.7, 0.6, 0.5, 0.4]
+        let tier = peak >= 75 ? 0 : peak >= 50 ? 1 : peak >= 25 ? 2 : 3
+        return theme.intensityColor(for: peak).opacity(opacities[tier])
     }
 
     private func dayTooltip(day: Date, peak: Double?) -> String {
@@ -150,18 +142,7 @@ private struct SparklineChart: View {
     private var theme: ColorTheme { AppSettings.shared.activeTheme }
 
     private func peakColor(for value: Double) -> Color {
-        switch theme {
-        case .default:
-            if value >= 75 { return ColorTheme.brandDark }
-            if value >= 50 { return ColorTheme.brand }
-            if value >= 25 { return ColorTheme.brandLight }
-            return ColorTheme.brandLighter
-        case .classic:
-            if value >= 75 { return .red }
-            if value >= 50 { return .orange }
-            if value >= 25 { return .yellow }
-            return .green
-        }
+        theme.intensityColor(for: value)
     }
 
     private var heatGradient: LinearGradient {

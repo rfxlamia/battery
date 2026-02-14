@@ -120,7 +120,7 @@ class NotificationService {
         return Date().timeIntervalSince(last) >= 300  // 5 min debounce for resets
     }
 
-    private func sendNotification(title: String, body: String) {
+    func sendNotification(title: String, body: String) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

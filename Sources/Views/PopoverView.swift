@@ -170,17 +170,11 @@ struct PopoverView: View {
                 .help("Check for Updates")
                 .focusable(false)
 
-                Button(action: { NSApplication.shared.terminate(nil) }) {
-                    Text("Quit")
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .focusable(false)
+                QuitButton()
             }
         }
         .padding(16)
         .animation(.none, value: viewModel.selectedAccountId)
-        .background(AppSettings.shared.activeTheme == .default ? ColorTheme.background : ColorTheme.classicBackground)
+        .background(AppSettings.shared.activeTheme.popoverBackground)
     }
 }

@@ -9,12 +9,6 @@ struct WeeklyGaugeView: View {
 
     private var settings: AppSettings { .shared }
 
-    private var displayPercentage: Int {
-        settings.showPercentageRemaining
-            ? Int(max(0, 100 - utilization))
-            : Int(utilization)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -23,31 +17,18 @@ struct WeeklyGaugeView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 HStack(spacing: 3) {
-                    Text("\(displayPercentage)%")
+                    Text("\(settings.displayPercentage(for: utilization))%")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(color)
                         .monospacedDigit()
-                    Text(settings.showPercentageRemaining ? "left" : "used")
+                    Text(settings.percentageSuffix)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
             }
 
-            // Horizontal progress bar
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(.quaternary)
-                        .frame(height: 6)
-
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(color)
-                        .frame(width: geometry.size.width * min(utilization / 100.0, 1.0), height: 6)
-                        .animation(.easeInOut(duration: 0.5), value: utilization)
-                }
-            }
-            .frame(height: 6)
+            ProgressBarView(value: utilization / 100.0, color: color)
 
             if let resetsAt = resetsAt {
                 CountdownLabel(targetDate: resetsAt, style: .compact, mode: settings.showTimeSinceReset ? .elapsed : .remaining)

@@ -12,6 +12,15 @@ struct BurnRateProjection {
         case stable
         case decreasing
     }
+
+    static func stable(at utilization: Double) -> BurnRateProjection {
+        BurnRateProjection(
+            currentRate: 0,
+            projectedLimitTime: nil,
+            projectedAtReset: utilization,
+            trend: .stable
+        )
+    }
 }
 
 enum BurnRateCalculator {
@@ -43,24 +52,14 @@ enum BurnRateCalculator {
         }
 
         guard currentSessionSnapshots.count >= minimumSnapshots else {
-            return BurnRateProjection(
-                currentRate: 0,
-                projectedLimitTime: nil,
-                projectedAtReset: currentUtilization,
-                trend: .stable
-            )
+            return .stable(at: currentUtilization)
         }
 
         let sorted = currentSessionSnapshots.sorted { $0.timestamp < $1.timestamp }
         let timeSpan = sorted.last!.timestamp.timeIntervalSince(sorted.first!.timestamp)
 
         guard timeSpan >= minimumTimeSpan else {
-            return BurnRateProjection(
-                currentRate: 0,
-                projectedLimitTime: nil,
-                projectedAtReset: currentUtilization,
-                trend: .stable
-            )
+            return .stable(at: currentUtilization)
         }
 
         // Linear regression: y = mx + b where x = time (hours), y = utilization (%)
@@ -84,12 +83,7 @@ enum BurnRateCalculator {
 
         let denominator = n * sumX2 - sumX * sumX
         guard abs(denominator) > 1e-10 else {
-            return BurnRateProjection(
-                currentRate: 0,
-                projectedLimitTime: nil,
-                projectedAtReset: currentUtilization,
-                trend: .stable
-            )
+            return .stable(at: currentUtilization)
         }
 
         // Slope = percentage points per hour.

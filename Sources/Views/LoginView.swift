@@ -52,17 +52,11 @@ struct LoginView: View {
 
             HStack {
                 Spacer()
-                Button(action: { NSApplication.shared.terminate(nil) }) {
-                    Text("Quit")
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .focusable(false)
+                QuitButton()
             }
         }
         .padding(16)
         .frame(width: 320)
-        .background(AppSettings.shared.activeTheme == .default ? ColorTheme.background : ColorTheme.classicBackground)
+        .background(AppSettings.shared.activeTheme.popoverBackground)
     }
 }
