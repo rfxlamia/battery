@@ -204,7 +204,7 @@ private struct SparklineChart: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Image(systemName: "chart.bar.fill")
                     .font(.system(size: 9))
@@ -263,6 +263,10 @@ private struct SparklineChart: View {
                         .font(.system(size: 8))
                         .foregroundStyle(Color.secondary.opacity(0.5))
                 }
+            }
+            .chartPlotStyle { plot in
+                plot.padding(.leading, -14)
+                    .padding(.trailing, 14)
             }
             .frame(height: 60)
         }
