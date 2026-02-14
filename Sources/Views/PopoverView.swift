@@ -118,9 +118,18 @@ struct PopoverView: View {
                 }
 
                 // Projections (Phase 2)
-                if viewModel.projection != nil {
-                    Divider()
+                Divider()
+                if let projection = viewModel.projection, projection.currentRate != 0 {
                     ProjectionView(projection: viewModel.projection, sessionResetsAt: viewModel.sessionResetsAt)
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text("Projections appear after more activity")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
 
                 // Stats: streak, heat map, 7-day chart (Phase 2+3)
