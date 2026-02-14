@@ -161,6 +161,7 @@ class UsageViewModel: ObservableObject {
                 )
                 self.accountManager.addAccount(account, tokens: tokens)
                 self.needsLogin = false
+                self.statsCacheService.reload()
                 self.configurePollingForSelectedAccount()
 
                 if !self.pollingService.isPolling {
@@ -422,6 +423,11 @@ class UsageViewModel: ObservableObject {
         // Ensure today appears in heatmap and sparkline with live data
         activeDays = injectTodayActivity(into: activeDays)
         dailyPeaks = injectTodayPeak(into: dailyPeaks)
+
+        // If stats are still empty after injection, try reloading stats-cache
+        if activeDays.isEmpty && dailyPeaks.isEmpty {
+            statsCacheService.reload()
+        }
 
         // Reset notification thresholds when utilization drops
         notificationService.resetThresholds(below: sessionUtilization)

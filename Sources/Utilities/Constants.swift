@@ -11,7 +11,7 @@ enum Constants {
     static let oauthTokenURL = "https://platform.claude.com/v1/oauth/token"
     static let oauthScopes = "user:profile user:inference"
     static let oauthRedirectPath = "/callback"
-    static let userAgent = "claude-code/2.0.32"
+    static let userAgent = "Battery/0.2.4"
 
     // Polling intervals (seconds)
     static let defaultPollInterval: TimeInterval = 60

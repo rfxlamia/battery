@@ -227,6 +227,11 @@ final class OAuthHTTPListener: @unchecked Sendable {
         }
         listenThread?.start()
 
+        // Auto-stop after 5 minutes to avoid leaked listeners
+        DispatchQueue.global().asyncAfter(deadline: .now() + 300) { [weak self] in
+            self?.stop()
+        }
+
         return port
     }
 

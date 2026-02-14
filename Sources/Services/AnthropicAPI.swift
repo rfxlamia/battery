@@ -69,6 +69,7 @@ actor AnthropicAPI {
                 let debugPath = FileManager.default.homeDirectoryForCurrentUser
                     .appendingPathComponent(".battery_debug_response.json").path
                 try? rawJSON.write(toFile: debugPath, atomically: true, encoding: .utf8)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: debugPath)
             }
             #endif
 
@@ -79,6 +80,7 @@ actor AnthropicAPI {
                 let debugPath = FileManager.default.homeDirectoryForCurrentUser
                     .appendingPathComponent(".battery_debug_error.txt").path
                 try? "\(error)".write(toFile: debugPath, atomically: true, encoding: .utf8)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: debugPath)
                 #endif
                 throw APIError.decodingError(error)
             }

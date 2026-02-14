@@ -7,8 +7,8 @@ let package = Package(
         .macOS(.v13)
     ],
     dependencies: [
-        .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.15.3"),
-        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
+        .package(url: "https://github.com/stephencelis/SQLite.swift.git", exact: "0.15.5"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.8.1"),
     ],
     targets: [
         .executableTarget(
