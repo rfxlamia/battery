@@ -51,6 +51,8 @@ struct StatsView: View {
 
             // 7-day sparkline chart
             if !dailyPeaks.isEmpty {
+                Divider()
+                    .padding(.vertical, 6)
                 SparklineChart(dailyPeaks: dailyPeaks)
             }
         }
