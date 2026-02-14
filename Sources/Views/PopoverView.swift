@@ -37,7 +37,7 @@ struct PopoverView: View {
 
             // Header
             HStack {
-                Text("Battery")
+                Text("Claude Battery")
                     .font(.headline)
                 Spacer()
                 if let tier = Optional(viewModel.planTier), tier != .unknown {
