@@ -26,22 +26,9 @@ struct StatsView: View {
 
                 Spacer()
 
-                HStack(spacing: 8) {
-                    Text("Last 30 Days")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-
-                    if todaySessionCount > 0 {
-                        HStack(spacing: 2) {
-                            Image(systemName: "circle.fill")
-                                .font(.system(size: 4))
-                                .foregroundStyle(.tertiary)
-                            Text("\(todaySessionCount) sessions")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                Text("Last 30 Days")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
 
             // 30-day heat map
