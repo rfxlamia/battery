@@ -195,12 +195,15 @@ class StatsCacheService: ObservableObject {
 
         // --- Daily peaks (last 7 days, normalized by messageCount) ---
         let cutoff7 = calendar.date(byAdding: .day, value: -7, to: today)!
-        let weekEntries = parsed.filter { $0.date >= cutoff7 }.sorted(by: { $0.date < $1.date })
-        let maxWeekMessages = weekEntries.map(\.activity.messageCount).max() ?? 1
+        let weekEntries = parsed.filter { $0.date >= cutoff7 }
+        let weekByDate = Dictionary(weekEntries.map { ($0.date, $0.activity.messageCount) }, uniquingKeysWith: max)
+        let maxWeekMessages = weekByDate.values.max() ?? 1
         var peaks: [(date: Date, peak: Double)] = []
-        for entry in weekEntries {
-            let normalized = Double(entry.activity.messageCount) / Double(max(maxWeekMessages, 1)) * 100.0
-            peaks.append((date: entry.date, peak: normalized))
+        for dayOffset in -7...0 {
+            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: today) else { continue }
+            let count = weekByDate[date] ?? 0
+            let normalized = Double(count) / Double(max(maxWeekMessages, 1)) * 100.0
+            peaks.append((date: date, peak: normalized))
         }
 
         DispatchQueue.main.async { [weak self] in
