@@ -6,6 +6,7 @@ struct BurnRateProjection {
     let projectedLimitTime: Date?     // when 100% will be hit (nil if rate <= 0 or already at 100%)
     let projectedAtReset: Double      // projected utilization at reset time
     let trend: Trend
+    let hasEnoughData: Bool           // true when regression had sufficient snapshots
 
     enum Trend: String {
         case increasing
@@ -13,12 +14,13 @@ struct BurnRateProjection {
         case decreasing
     }
 
-    static func stable(at utilization: Double) -> BurnRateProjection {
+    static func insufficientData(at utilization: Double) -> BurnRateProjection {
         BurnRateProjection(
             currentRate: 0,
             projectedLimitTime: nil,
             projectedAtReset: utilization,
-            trend: .stable
+            trend: .stable,
+            hasEnoughData: false
         )
     }
 }
@@ -52,14 +54,14 @@ enum BurnRateCalculator {
         }
 
         guard currentSessionSnapshots.count >= minimumSnapshots else {
-            return .stable(at: currentUtilization)
+            return .insufficientData(at: currentUtilization)
         }
 
         let sorted = currentSessionSnapshots.sorted { $0.timestamp < $1.timestamp }
         let timeSpan = sorted.last!.timestamp.timeIntervalSince(sorted.first!.timestamp)
 
         guard timeSpan >= minimumTimeSpan else {
-            return .stable(at: currentUtilization)
+            return .insufficientData(at: currentUtilization)
         }
 
         // Linear regression: y = mx + b where x = time (hours), y = utilization (%)
@@ -83,7 +85,7 @@ enum BurnRateCalculator {
 
         let denominator = n * sumX2 - sumX * sumX
         guard abs(denominator) > 1e-10 else {
-            return .stable(at: currentUtilization)
+            return .insufficientData(at: currentUtilization)
         }
 
         // Slope = percentage points per hour.
@@ -116,7 +118,8 @@ enum BurnRateCalculator {
             currentRate: slope,
             projectedLimitTime: projectedLimitTime,
             projectedAtReset: projectedAtReset,
-            trend: trend
+            trend: trend,
+            hasEnoughData: true
         )
     }
 }

@@ -6,7 +6,7 @@ struct ProjectionView: View {
     let sessionResetsAt: Date?
 
     var body: some View {
-        if let projection = projection, projection.currentRate != 0 {
+        if let projection = projection, projection.hasEnoughData {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
                     Image(systemName: "chart.line.uptrend.xyaxis")

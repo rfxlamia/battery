@@ -128,7 +128,7 @@ struct PopoverView: View {
 
                 // Projections (Phase 2)
                 Divider()
-                if let projection = viewModel.projection, projection.currentRate != 0 {
+                if let projection = viewModel.projection, projection.hasEnoughData {
                     ProjectionView(projection: viewModel.projection, sessionResetsAt: viewModel.sessionResetsAt)
                 } else {
                     HStack(spacing: 4) {

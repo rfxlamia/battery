@@ -37,6 +37,7 @@ final class BurnRateCalculatorTests: XCTestCase {
         XCTAssertNil(result.projectedLimitTime)
         XCTAssertEqual(result.projectedAtReset, 25)
         XCTAssertEqual(result.trend, .stable)
+        XCTAssertFalse(result.hasEnoughData)
     }
 
     func testZeroBurnRate() {
@@ -57,6 +58,7 @@ final class BurnRateCalculatorTests: XCTestCase {
         XCTAssertNil(result.projectedLimitTime)
         XCTAssertEqual(result.projectedAtReset, 40, accuracy: 1.0)
         XCTAssertEqual(result.trend, .stable)
+        XCTAssertTrue(result.hasEnoughData)
     }
 
     func testLinearIncreasingRate() {
@@ -124,10 +126,11 @@ final class BurnRateCalculatorTests: XCTestCase {
             resetsAt: resetsAt
         )
 
-        // Should fall back to stable because only 2 current-session snapshots
+        // Should fall back to insufficient data because only 2 current-session snapshots
         XCTAssertEqual(result.currentRate, 0)
         XCTAssertEqual(result.projectedAtReset, 8)
         XCTAssertEqual(result.trend, .stable)
+        XCTAssertFalse(result.hasEnoughData)
     }
 
     func testHighBurnRate() {
@@ -188,5 +191,6 @@ final class BurnRateCalculatorTests: XCTestCase {
 
         XCTAssertEqual(result.currentRate, 0)
         XCTAssertEqual(result.trend, .stable)
+        XCTAssertFalse(result.hasEnoughData)
     }
 }
