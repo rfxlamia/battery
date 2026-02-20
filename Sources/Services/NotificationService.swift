@@ -54,7 +54,7 @@ class NotificationService {
             if shouldSendResetNotification() {
                 sendNotification(
                     title: "Session Reset",
-                    body: "Your 5-hour session usage has reset. You're back to \(Int(sessionUtilization))%."
+                    body: "Your 5-hour session usage has reset. You're back to \(Int(sessionUtilization.rounded()))%."
                 )
                 lastResetNotification = Date()
                 // Clear notified thresholds on reset
@@ -96,7 +96,7 @@ class NotificationService {
                 if shouldSendThresholdNotification(threshold) {
                     sendNotification(
                         title: "Session Usage at \(threshold)%",
-                        body: "Your 5-hour Claude Code session is at \(Int(sessionUtilization))% utilization."
+                        body: "Your 5-hour Claude Code session is at \(Int(sessionUtilization.rounded()))% utilization."
                     )
                     notifiedThresholds.insert(threshold)
                     thresholdNotifiedAt[threshold] = Date()

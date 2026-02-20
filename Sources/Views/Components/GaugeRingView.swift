@@ -31,7 +31,7 @@ struct GaugeRingView: View {
                 .animation(.easeInOut(duration: 0.5), value: value)
 
             // Center percentage
-            Text("\(Int(value * 100))")
+            Text("\(Int((value * 100).rounded()))")
                 .font(.system(size: size * 0.28, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(color)

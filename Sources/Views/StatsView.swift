@@ -113,7 +113,7 @@ private struct HeatMapView: View {
         formatter.dateStyle = .medium
         let dateStr = formatter.string(from: day)
         if let peak = peak {
-            return "\(dateStr): \(Int(peak))% peak"
+            return "\(dateStr): \(Int(peak.rounded()))% peak"
         }
         return "\(dateStr): no activity"
     }
@@ -201,7 +201,7 @@ private struct SparklineChart: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 if let lastPeak = dailyPeaks.last {
-                    Text("\(lastPeakLabel(lastPeak.date)): \(Int(lastPeak.peak))%")
+                    Text("\(lastPeakLabel(lastPeak.date)): \(Int(lastPeak.peak.rounded()))%")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }

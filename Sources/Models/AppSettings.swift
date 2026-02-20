@@ -122,8 +122,8 @@ class AppSettings: ObservableObject {
     /// Display percentage accounting for the "remaining" preference.
     func displayPercentage(for utilization: Double) -> Int {
         showPercentageRemaining
-            ? Int(max(0, 100 - utilization))
-            : Int(utilization)
+            ? Int(max(0, (100 - utilization)).rounded())
+            : Int(utilization.rounded())
     }
 
     /// "left" or "used" suffix matching the percentage display preference.

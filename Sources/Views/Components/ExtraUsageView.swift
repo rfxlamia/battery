@@ -21,7 +21,7 @@ struct ExtraUsageView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 if let utilization = utilization {
-                    Text("\(Int(utilization))%")
+                    Text("\(Int(utilization.rounded()))%")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(UsageLevel.from(utilization: utilization).color)
