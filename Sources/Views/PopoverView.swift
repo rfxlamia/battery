@@ -18,8 +18,14 @@ struct PopoverView: View {
         }
         .animation(.none, value: showSettings)
         .animation(.none, value: viewModel.needsLogin)
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
-            showSettings = false
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { notification in
+            guard let window = notification.object as? NSWindow,
+                  window.className.contains("StatusBarWindow") || window.className.contains("MenuBarExtra") ||
+                  window.level == .statusBar || window.level == .popUpMenu else { return }
+            // Delay reset until after the panel's close animation finishes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                showSettings = false
+            }
         }
     }
 
