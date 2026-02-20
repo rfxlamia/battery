@@ -18,6 +18,9 @@ struct PopoverView: View {
         }
         .animation(.none, value: showSettings)
         .animation(.none, value: viewModel.needsLogin)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            showSettings = false
+        }
     }
 
     private var mainContent: some View {
