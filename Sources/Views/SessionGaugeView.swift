@@ -13,7 +13,7 @@ struct SessionGaugeView: View {
         HStack(spacing: 16) {
             // Circular gauge
             GaugeRingView(
-                value: utilization / 100.0,
+                value: Double(settings.displayPercentage(for: utilization)) / 100.0,
                 color: color,
                 size: 56
             )
