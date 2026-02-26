@@ -2,6 +2,7 @@
 > by All Things Claude
 
 ![Battery](assets/battery.webp)
+![Battery](assets/update.webp)
 
 A macOS menu bar app that monitors your Claude Code API usage in real time.
 
@@ -13,7 +14,10 @@ Battery lives in your menu bar and shows how much of your Claude Code rate limit
 - **Opus tracking** - Separate gauge for Opus model usage when applicable
 - **Extra usage monitoring** - Track overuse credits and monthly spending limits
 - **Burn rate projections** - Linear regression on recent snapshots predicts when you'll hit your limit and what your utilization will be at reset
-- **Usage streaks & heatmap** - See your daily activity patterns, current streak, and a 7-day sparkline
+- **Usage streaks & heatmap** - See your daily activity patterns, current streak, and a GitHub-style contribution heatmap
+- **7-day usage chart** - Area chart showing your daily usage trends over the past week
+- **Multi-account support** - Manage up to 5 Claude accounts and switch between them
+- **Color themes** - Choose between a default claude theme and a classic multi-color theme
 - **Configurable notifications** - Get alerted at 80%, 90%, and 95% thresholds (customizable)
 - **Session detection** - Integrates with Claude Code hooks to detect active coding sessions and poll more frequently
 - **Auto-updates** - Built-in Sparkle updater checks for new versions automatically
@@ -37,12 +41,12 @@ Download the latest DMG from [Releases](https://github.com/allthingsclaude/batte
 
 ## Prerequisites
 
-Battery reads your Claude Code OAuth credentials from your system keychain (stored there by Claude Code itself). You need:
+Battery authenticates via OAuth using the same credentials as Claude Code. You need:
 
 1. **Claude Code** installed and authenticated (this creates the OAuth tokens Battery uses)
 2. **macOS 13.0** (Ventura) or later
 
-No additional configuration is needed - Battery automatically finds and refreshes your OAuth tokens.
+On first launch, Battery will prompt you to sign in. It automatically refreshes your OAuth tokens as needed. Credentials are stored locally in `~/.battery/tokens/` with restricted file permissions (0600) rather than in the macOS Keychais, avoiding the repeated "enter your keychain password" prompts that occur after restarts and app updates.
 
 ## Session Detection (Optional)
 
