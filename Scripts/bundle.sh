@@ -103,34 +103,21 @@ fi
 cp "$PROJECT_DIR/Scripts/claude-battery" "$APP_BUNDLE/Contents/Resources/claude-battery"
 chmod +x "$APP_BUNDLE/Contents/Resources/claude-battery"
 
-# Prepare entitlements (release builds get keychain-access-groups for Data Protection keychain)
-ENTITLEMENTS="$PROJECT_DIR/Battery.entitlements"
-if [[ "$CODESIGN_IDENTITY" != "-" && -n "${APPLE_TEAM_ID:-}" ]]; then
-    ENTITLEMENTS="$PROJECT_DIR/Battery.entitlements.tmp"
-    cp "$PROJECT_DIR/Battery.entitlements" "$ENTITLEMENTS"
-    /usr/libexec/PlistBuddy -c "Add :keychain-access-groups array" "$ENTITLEMENTS"
-    /usr/libexec/PlistBuddy -c "Add :keychain-access-groups:0 string ${APPLE_TEAM_ID}.com.allthingsclaude.battery" "$ENTITLEMENTS"
-    echo "    Keychain access group: ${APPLE_TEAM_ID}.com.allthingsclaude.battery"
-fi
-
 # Sign the app
 if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
     # Ad-hoc signing for development
     codesign --force --sign - \
-        --entitlements "$ENTITLEMENTS" \
+        --entitlements "$PROJECT_DIR/Battery.entitlements" \
         "$APP_BUNDLE"
 else
     # Developer ID signing for release
     codesign --force --sign "$CODESIGN_IDENTITY" \
-        --entitlements "$ENTITLEMENTS" \
+        --entitlements "$PROJECT_DIR/Battery.entitlements" \
         --options runtime \
         --timestamp \
         --deep \
         "$APP_BUNDLE"
 fi
-
-# Clean up temp entitlements
-rm -f "$PROJECT_DIR/Battery.entitlements.tmp"
 
 echo ""
 echo "==> Created: $APP_BUNDLE"
