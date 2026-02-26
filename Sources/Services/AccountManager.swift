@@ -4,10 +4,10 @@ import Security
 
 /// Manages multiple accounts and their token storage.
 ///
-/// Tokens are stored in the macOS Keychain. Account metadata lives at:
-/// ```
-/// ~/.battery/accounts.json  — Array of Account (0600 perms)
-/// ```
+/// Tokens are stored in the Data Protection keychain when available (release builds
+/// signed with a team ID and the `keychain-access-groups` entitlement). Falls back
+/// to file-based storage in `~/.battery/tokens/` (0600 perms) for dev builds.
+/// Account metadata lives at `~/.battery/accounts.json` (0600 perms).
 @MainActor
 class AccountManager: ObservableObject {
     @Published var accounts: [Account] = []
@@ -48,9 +48,6 @@ class AccountManager: ObservableObject {
             print("Failed to load accounts: \(error.localizedDescription)")
         }
 
-        // Migrate tokens from disk to Keychain (one-time)
-        migrateTokensFromDiskToKeychain()
-
         if let savedId = UserDefaults.standard.string(forKey: "selectedAccountId"),
            let uuid = UUID(uuidString: savedId),
            accounts.contains(where: { $0.id == uuid }) {
@@ -83,10 +80,10 @@ class AccountManager: ObservableObject {
     func removeAccount(id: UUID) {
         accounts.removeAll(where: { $0.id == id })
 
-        // Remove from Keychain
-        keychainDelete(accountId: id)
+        // Remove tokens from all storage backends
+        deleteTokens(for: id)
 
-        // Clean up any leftover disk tokens
+        // Clean up any leftover legacy tokens
         let tokenDir = accountsDir.appendingPathComponent(id.uuidString)
         try? fileManager.removeItem(at: tokenDir)
 
@@ -102,7 +99,7 @@ class AccountManager: ObservableObject {
     func removeAllAccounts() {
         let ids = accounts.map(\.id)
         for id in ids {
-            keychainDelete(accountId: id)
+            deleteTokens(for: id)
             let tokenDir = accountsDir.appendingPathComponent(id.uuidString)
             try? fileManager.removeItem(at: tokenDir)
         }
@@ -126,41 +123,103 @@ class AccountManager: ObservableObject {
 
     // MARK: - Token Storage
 
+    /// Cached after first probe — `true` when the Data Protection keychain is usable.
+    private var _dataProtectionAvailable: Bool?
+
+    /// Returns `true` when the app has the `keychain-access-groups` entitlement
+    /// and is signed with a team ID (release builds). Probed once by writing and
+    /// deleting a sentinel item.
+    private var isDataProtectionAvailable: Bool {
+        if let cached = _dataProtectionAvailable { return cached }
+
+        let probe: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: "__dp_probe__",
+            kSecValueData as String: Data([0x00]),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecUseDataProtectionKeychain as String: true,
+        ]
+        let addStatus = SecItemAdd(probe as CFDictionary, nil)
+        if addStatus == errSecSuccess || addStatus == errSecDuplicateItem {
+            // Clean up probe
+            var deleteQuery = probe
+            deleteQuery.removeValue(forKey: kSecValueData as String)
+            deleteQuery.removeValue(forKey: kSecAttrAccessible as String)
+            SecItemDelete(deleteQuery as CFDictionary)
+            _dataProtectionAvailable = true
+        } else {
+            _dataProtectionAvailable = false
+        }
+        return _dataProtectionAvailable!
+    }
+
+    private var tokensDir: URL {
+        batteryDir.appendingPathComponent("tokens")
+    }
+
+    private func tokenFile(for accountId: UUID) -> URL {
+        tokensDir.appendingPathComponent("\(accountId.uuidString).json")
+    }
+
     func getTokens(for accountId: UUID) -> StoredTokens? {
-        // Read from Keychain
-        if let tokens = keychainLoad(accountId: accountId) {
+        // 1. Data Protection keychain (release builds)
+        if isDataProtectionAvailable, let tokens = dpKeychainLoad(accountId: accountId) {
             return tokens
         }
 
-        // Fall back to disk for pre-migration installs
-        let tokenFile = accountsDir
+        // 2. File-based storage (dev builds, or migrated tokens)
+        let file = tokenFile(for: accountId)
+        if fileManager.fileExists(atPath: file.path) {
+            do {
+                let data = try Data(contentsOf: file)
+                return try JSONDecoder().decode(StoredTokens.self, from: data)
+            } catch {
+                print("Failed to read tokens for \(accountId): \(error.localizedDescription)")
+            }
+        }
+
+        // 3. Migrate from legacy file-based keychain (one-time)
+        if let tokens = migrateFromLegacyKeychain(accountId: accountId) {
+            return tokens
+        }
+
+        // 4. Legacy: old per-account directory structure
+        let legacyFile = accountsDir
             .appendingPathComponent(accountId.uuidString)
             .appendingPathComponent("tokens.json")
-        guard fileManager.fileExists(atPath: tokenFile.path) else { return nil }
+        guard fileManager.fileExists(atPath: legacyFile.path) else { return nil }
         do {
-            let data = try Data(contentsOf: tokenFile)
+            let data = try Data(contentsOf: legacyFile)
             let tokens = try JSONDecoder().decode(StoredTokens.self, from: data)
-            // Migrate to Keychain, then remove disk copy
-            keychainSave(tokens: tokens, accountId: accountId)
-            try? fileManager.removeItem(at: tokenFile)
+            saveTokens(tokens, for: accountId)
+            try? fileManager.removeItem(at: legacyFile)
             return tokens
         } catch {
-            print("Failed to read tokens for \(accountId): \(error.localizedDescription)")
+            print("Failed to read legacy tokens for \(accountId): \(error.localizedDescription)")
             return nil
         }
     }
 
     func saveTokens(_ tokens: StoredTokens, for accountId: UUID) {
-        keychainSave(tokens: tokens, accountId: accountId)
+        if isDataProtectionAvailable {
+            dpKeychainSave(tokens: tokens, accountId: accountId)
+        } else {
+            saveTokensToFile(tokens, for: accountId)
+        }
     }
 
-    // MARK: - Keychain Helpers
+    func deleteTokens(for accountId: UUID) {
+        dpKeychainDelete(accountId: accountId)
+        deleteTokenFile(for: accountId)
+    }
 
-    private func keychainSave(tokens: StoredTokens, accountId: UUID) {
+    // MARK: - Data Protection Keychain (release builds)
+
+    private func dpKeychainSave(tokens: StoredTokens, accountId: UUID) {
         guard let data = try? JSONEncoder().encode(tokens) else { return }
 
-        // Delete existing item first (SecItemAdd fails on duplicate)
-        keychainDelete(accountId: accountId)
+        dpKeychainDelete(accountId: accountId)
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -168,15 +227,66 @@ class AccountManager: ObservableObject {
             kSecAttrAccount as String: accountId.uuidString,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecUseDataProtectionKeychain as String: true,
         ]
 
         let status = SecItemAdd(query as CFDictionary, nil)
         if status != errSecSuccess {
-            print("Keychain save failed for \(accountId): \(status)")
+            print("DP Keychain save failed (\(status)), falling back to file")
+            saveTokensToFile(tokens, for: accountId)
         }
     }
 
-    private func keychainLoad(accountId: UUID) -> StoredTokens? {
+    private func dpKeychainLoad(accountId: UUID) -> StoredTokens? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: accountId.uuidString,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseDataProtectionKeychain as String: true,
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return try? JSONDecoder().decode(StoredTokens.self, from: data)
+    }
+
+    @discardableResult
+    private func dpKeychainDelete(accountId: UUID) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: accountId.uuidString,
+            kSecUseDataProtectionKeychain as String: true,
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+
+    // MARK: - File-Based Token Storage (dev builds / fallback)
+
+    private func saveTokensToFile(_ tokens: StoredTokens, for accountId: UUID) {
+        do {
+            try fileManager.createDirectory(at: tokensDir, withIntermediateDirectories: true)
+            try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: tokensDir.path)
+            let data = try JSONEncoder().encode(tokens)
+            try data.write(to: tokenFile(for: accountId), options: .atomic)
+            try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tokenFile(for: accountId).path)
+        } catch {
+            print("Failed to save tokens for \(accountId): \(error.localizedDescription)")
+        }
+    }
+
+    private func deleteTokenFile(for accountId: UUID) {
+        try? fileManager.removeItem(at: tokenFile(for: accountId))
+    }
+
+    // MARK: - Legacy Keychain Migration
+
+    /// One-time: read from the old file-based keychain, save to current storage, delete legacy entry.
+    private func migrateFromLegacyKeychain(accountId: UUID) -> StoredTokens? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Self.keychainService,
@@ -187,53 +297,21 @@ class AccountManager: ObservableObject {
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        guard status == errSecSuccess, let data = result as? Data,
+              let tokens = try? JSONDecoder().decode(StoredTokens.self, from: data) else {
+            return nil
+        }
 
-        return try? JSONDecoder().decode(StoredTokens.self, from: data)
-    }
-
-    @discardableResult
-    private func keychainDelete(accountId: UUID) -> Bool {
-        let query: [String: Any] = [
+        // Save to current storage and remove legacy entry
+        saveTokens(tokens, for: accountId)
+        let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Self.keychainService,
             kSecAttrAccount as String: accountId.uuidString,
         ]
+        SecItemDelete(deleteQuery as CFDictionary)
 
-        let status = SecItemDelete(query as CFDictionary)
-        return status == errSecSuccess || status == errSecItemNotFound
-    }
-
-    // MARK: - Migration
-
-    private func migrateTokensFromDiskToKeychain() {
-        guard fileManager.fileExists(atPath: accountsDir.path) else { return }
-
-        var migratedAny = false
-        for account in accounts {
-            let tokenFile = accountsDir
-                .appendingPathComponent(account.id.uuidString)
-                .appendingPathComponent("tokens.json")
-            guard fileManager.fileExists(atPath: tokenFile.path) else { continue }
-
-            do {
-                let data = try Data(contentsOf: tokenFile)
-                let tokens = try JSONDecoder().decode(StoredTokens.self, from: data)
-                // Only migrate if not already in Keychain
-                if keychainLoad(accountId: account.id) == nil {
-                    keychainSave(tokens: tokens, accountId: account.id)
-                }
-                try fileManager.removeItem(at: tokenFile)
-                migratedAny = true
-            } catch {
-                print("Migration failed for \(account.id): \(error.localizedDescription)")
-            }
-        }
-
-        // Clean up the accounts directory if all token files were migrated
-        if migratedAny {
-            try? fileManager.removeItem(at: accountsDir)
-        }
+        return tokens
     }
 
     // MARK: - Private

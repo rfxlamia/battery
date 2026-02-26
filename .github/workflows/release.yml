@@ -72,6 +72,7 @@ jobs:
       - name: Bundle app
         env:
           CODESIGN_IDENTITY: ${{ secrets.MACOS_CERTIFICATE_NAME }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           VERSION: ${{ steps.version.outputs.version }}
           BUILD_NUMBER: ${{ steps.version.outputs.build }}
         run: |

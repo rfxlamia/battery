@@ -7,9 +7,11 @@ class NotificationService {
     private var lastProjectionNotification: Date?
     private var lastResetNotification: Date?
     private var previousSessionUtilization: Double?
+    private var lastCredentialNotification: Date?
 
     private let projectionDebounceInterval: TimeInterval = 1800  // 30 minutes
     private let thresholdDebounceInterval: TimeInterval = 3600   // 1 hour
+    private let credentialDebounceInterval: TimeInterval = 3600  // 1 hour
 
     /// Track when each threshold was last notified to prevent spam
     private var thresholdNotifiedAt: [Int: Date] = [:]
@@ -67,10 +69,12 @@ class NotificationService {
     }
 
     func notifyTokenRefreshFailure() {
+        guard shouldSendCredentialNotification() else { return }
         sendNotification(
             title: "Credentials Need Attention",
             body: "Battery couldn't refresh your token. Please sign in again from Battery."
         )
+        lastCredentialNotification = Date()
     }
 
     func resetThresholds(below utilization: Double) {
@@ -118,6 +122,11 @@ class NotificationService {
     private func shouldSendResetNotification() -> Bool {
         guard let last = lastResetNotification else { return true }
         return Date().timeIntervalSince(last) >= 300  // 5 min debounce for resets
+    }
+
+    private func shouldSendCredentialNotification() -> Bool {
+        guard let last = lastCredentialNotification else { return true }
+        return Date().timeIntervalSince(last) >= credentialDebounceInterval
     }
 
     func sendNotification(title: String, body: String) {
