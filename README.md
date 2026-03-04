@@ -1,8 +1,8 @@
 # Battery
 > by All Things Claude
 
-![Battery](assets/battery.webp)
 ![Battery](assets/update.webp)
+![Battery](assets/battery.webp)
 
 A macOS menu bar app that monitors your Claude Code API usage in real time.
 
