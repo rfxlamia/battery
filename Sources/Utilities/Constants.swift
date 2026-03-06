@@ -15,7 +15,7 @@ enum Constants {
 
     // Polling intervals (seconds)
     static let defaultPollInterval: TimeInterval = 60
-    static let activePollInterval: TimeInterval = 30
+    static let activePollInterval: TimeInterval = 60
     static let idlePollInterval: TimeInterval = 300
 
     // Notification thresholds

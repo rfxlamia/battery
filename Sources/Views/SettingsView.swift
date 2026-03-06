@@ -268,12 +268,12 @@ struct SettingsView: View {
                     Text("Active interval")
                         .font(.caption)
                     Spacer()
-                    Text("\(Int(settings.pollIntervalActive))s")
+                    Text("\(Int(settings.pollIntervalActive / 60))m")
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $settings.pollIntervalActive, in: 15...120, step: 15)
+                Slider(value: $settings.pollIntervalActive, in: 60...300, step: 60)
                     .controlSize(.small)
             }
 
@@ -287,7 +287,7 @@ struct SettingsView: View {
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $settings.pollIntervalIdle, in: 60...600, step: 60)
+                Slider(value: $settings.pollIntervalIdle, in: 300...900, step: 300)
                     .controlSize(.small)
             }
 

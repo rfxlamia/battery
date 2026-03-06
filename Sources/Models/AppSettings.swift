@@ -100,7 +100,7 @@ class AppSettings: ObservableObject {
     @AppStorage("showTimeSinceReset") var showTimeSinceReset: Bool = false
 
     // Polling
-    @AppStorage("pollIntervalActive") var pollIntervalActive: Double = 30
+    @AppStorage("pollIntervalActive") var pollIntervalActive: Double = 60
     @AppStorage("pollIntervalIdle") var pollIntervalIdle: Double = 300
 
     // General

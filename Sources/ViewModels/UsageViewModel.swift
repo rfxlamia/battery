@@ -330,8 +330,15 @@ class UsageViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] error in
                 self?.error = error?.localizedDescription
+                // Only disconnect for non-transient errors (not rate limits)
                 if error != nil {
-                    self?.isConnected = false
+                    let isRateLimit = (error as? AnthropicAPI.APIError).flatMap {
+                        if case .rateLimited = $0 { return true }
+                        return false
+                    } ?? false
+                    if !isRateLimit {
+                        self?.isConnected = false
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -343,7 +350,8 @@ class UsageViewModel: ObservableObject {
             .sink { [weak self] active in
                 guard let self = self else { return }
                 self.isSessionActive = active
-                let interval = active ? Constants.activePollInterval : Constants.idlePollInterval
+                let settings = AppSettings.shared
+                let interval = active ? settings.pollIntervalActive : settings.pollIntervalIdle
                 self.pollingService.setInterval(interval)
             }
             .store(in: &cancellables)
