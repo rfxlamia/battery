@@ -3,6 +3,10 @@ import Foundation
 /// Client for the Anthropic OAuth usage API.
 actor AnthropicAPI {
 
+    private static let logDir = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".battery")
+    private static let logFile = logDir.appendingPathComponent("rate-limits.log")
+
     enum APIError: LocalizedError {
         case unauthorized
         case rateLimited(retryAfter: TimeInterval?)
@@ -58,6 +62,7 @@ actor AnthropicAPI {
             case 429:
                 let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After")
                     .flatMap { TimeInterval($0) }
+                Self.logRateLimitHeaders(httpResponse, body: String(data: data, encoding: .utf8))
                 throw APIError.rateLimited(retryAfter: retryAfter)
             default:
                 let body = String(data: data, encoding: .utf8) ?? "No body"
@@ -89,5 +94,41 @@ actor AnthropicAPI {
         } catch {
             throw APIError.networkError(error)
         }
+    }
+
+    /// Append rate limit headers to ~/.battery/rate-limits.log
+    private static func logRateLimitHeaders(_ response: HTTPURLResponse, body: String?) {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: logDir, withIntermediateDirectories: true)
+
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        var lines = ["[\(timestamp)] 429 Rate Limited"]
+
+        // Log all rate-limit related headers
+        let headers = response.allHeaderFields
+        for (key, value) in headers {
+            let name = "\(key)"
+            if name.lowercased().contains("ratelimit") ||
+               name.lowercased().contains("rate-limit") ||
+               name.lowercased() == "retry-after" {
+                lines.append("  \(name): \(value)")
+            }
+        }
+
+        if let body = body, !body.isEmpty {
+            lines.append("  Body: \(body)")
+        }
+
+        lines.append("")
+        let entry = lines.joined(separator: "\n") + "\n"
+
+        if let handle = try? FileHandle(forWritingTo: logFile) {
+            handle.seekToEndOfFile()
+            handle.write(entry.data(using: .utf8)!)
+            handle.closeFile()
+        } else {
+            try? entry.write(to: logFile, atomically: true, encoding: .utf8)
+        }
+        try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: logFile.path)
     }
 }
