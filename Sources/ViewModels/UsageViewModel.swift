@@ -52,6 +52,7 @@ class UsageViewModel: ObservableObject {
     private var dbInitialized = false
     private var todayPeakSeen: Double = 0
     private var todayPeakDate: Date = Calendar.current.startOfDay(for: Date())
+    private var isReauthenticating = false
 
     // Per-account usage state cache
     private var accountUsageStates: [UUID: AccountUsageState] = [:]
@@ -198,6 +199,46 @@ class UsageViewModel: ObservableObject {
         Task { await pollingService.pollNow() }
     }
 
+    /// Re-authenticate the current account (replaces tokens without creating a new account).
+    func reauthenticateCurrentAccount() {
+        attemptSilentReauth()
+    }
+
+    /// Silently re-authenticate the current account when the refresh token expires.
+    /// Opens the browser OAuth flow. If the user completes it, tokens are replaced
+    /// and polling resumes. If it fails, falls back to a notification.
+    private func attemptSilentReauth() {
+        guard !isReauthenticating else { return }
+        guard let account = accountManager.selectedAccount else {
+            notificationService.notifyTokenRefreshFailure()
+            return
+        }
+
+        isReauthenticating = true
+        error = "Session expired — signing in again…"
+
+        oauthService.startLogin { [weak self] result in
+            guard let self = self else { return }
+            self.isReauthenticating = false
+
+            switch result {
+            case .success(let tokenPair):
+                let tokens = StoredTokens(
+                    accessToken: tokenPair.accessToken,
+                    refreshToken: tokenPair.refreshToken,
+                    expiresIn: tokenPair.expiresIn
+                )
+                self.accountManager.saveTokens(tokens, for: account.id)
+                self.error = nil
+                self.configurePollingForSelectedAccount()
+                Task { await self.pollingService.pollNow() }
+
+            case .failure:
+                self.notificationService.notifyTokenRefreshFailure()
+            }
+        }
+    }
+
     func removeAccount(id: UUID) {
         accountUsageStates.removeValue(forKey: id)
         accountManager.removeAccount(id: id)
@@ -241,7 +282,7 @@ class UsageViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] needsReauth in
                 guard let self = self, needsReauth else { return }
-                self.notificationService.notifyTokenRefreshFailure()
+                self.attemptSilentReauth()
             }
             .store(in: &cancellables)
     }

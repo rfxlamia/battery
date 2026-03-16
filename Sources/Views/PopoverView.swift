@@ -63,13 +63,35 @@ struct PopoverView: View {
             if let error = viewModel.error, !viewModel.isConnected {
                 // Error state (only when we have no data at all)
                 VStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.title2)
-                        .foregroundStyle(.orange)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                    if error.contains("Session expired") {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.title2)
+                            .foregroundStyle(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    } else if error.contains("invalid_grant") || error.contains("Refresh token") {
+                        Image(systemName: "person.crop.circle.badge.exclamationmark")
+                            .font(.title2)
+                            .foregroundStyle(.orange)
+                        Text("Session expired. Please sign in again.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button("Sign In") {
+                            viewModel.reauthenticateCurrentAccount()
+                        }
+                        .controlSize(.small)
+                    } else {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.title2)
+                            .foregroundStyle(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
