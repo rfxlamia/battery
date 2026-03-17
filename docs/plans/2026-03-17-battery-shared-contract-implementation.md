@@ -29,6 +29,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:contracts": "vitest run test/contracts",
     "test:watch": "vitest"
   },
   "devDependencies": {
@@ -39,7 +40,13 @@
 }
 ```
 
-**Step 2: Write the first failing contract test**
+**Step 2: Install the workspace dependencies**
+
+Run: `cd port/core && npm install`
+
+Expected: PASS and create the lockfile plus local test tooling.
+
+**Step 3: Write the first failing contract test**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -58,13 +65,13 @@ describe('batteryStateSchema', () => {
 });
 ```
 
-**Step 3: Run test to verify it fails**
+**Step 4: Run test to verify it fails**
 
-Run: `cd port/core && npm test -- --runInBand`
+Run: `cd port/core && npm run test:contracts -- state-contract.test.ts`
 
 Expected: FAIL because `batteryStateSchema` does not exist yet.
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
 git add port/core
@@ -83,19 +90,34 @@ git commit -m "build: bootstrap shared contract workspace"
 ```ts
 import { z } from 'zod';
 
+const isoDateTime = z.string().datetime({ offset: true });
+
 export const batteryStateSchema = z.object({
   version: z.literal(1),
   status: z.enum(['ok', 'loading', 'login_required', 'error']),
-  updatedAt: z.string(),
+  updatedAt: isoDateTime,
   account: z.object({
     id: z.string(),
     name: z.string(),
     planTier: z.string(),
+    isSelected: z.literal(true),
   }).optional(),
   session: z.object({
     utilization: z.number(),
-    resetsAt: z.string().nullable(),
+    resetsAt: isoDateTime.nullable(),
     isActive: z.boolean(),
+  }).optional(),
+  weekly: z.object({
+    utilization: z.number(),
+    resetsAt: isoDateTime.nullable(),
+  }).optional(),
+  freshness: z.object({
+    staleAfterSeconds: z.number().int().positive(),
+  }),
+  error: z.object({
+    kind: z.enum(['unauthorized', 'rate_limited', 'server_error', 'network_error', 'decoding_error']),
+    message: z.string(),
+    retryAfterSeconds: z.number().int().positive().optional(),
   }).optional(),
 });
 ```
@@ -103,11 +125,55 @@ export const batteryStateSchema = z.object({
 **Step 2: Expand tests for the happy path and error path**
 
 ```ts
+it('accepts the MVP ok state with weekly and freshness metadata', () => {
+  const result = batteryStateSchema.safeParse({
+    version: 1,
+    status: 'ok',
+    updatedAt: '2026-03-17T00:00:00.000Z',
+    account: {
+      id: 'acct-1',
+      name: 'Primary',
+      planTier: 'pro',
+      isSelected: true,
+    },
+    session: {
+      utilization: 0.32,
+      resetsAt: '2026-03-17T05:00:00.000Z',
+      isActive: true,
+    },
+    weekly: {
+      utilization: 0.18,
+      resetsAt: '2026-03-24T00:00:00.000Z',
+    },
+    freshness: {
+      staleAfterSeconds: 360,
+    },
+  });
+
+  expect(result.success).toBe(true);
+});
+
 it('rejects an unknown status', () => {
   const result = batteryStateSchema.safeParse({
     version: 1,
     status: 'mystery',
     updatedAt: '2026-03-17T00:00:00.000Z',
+    freshness: {
+      staleAfterSeconds: 360,
+    },
+  });
+
+  expect(result.success).toBe(false);
+});
+
+it('rejects an invalid timestamp', () => {
+  const result = batteryStateSchema.safeParse({
+    version: 1,
+    status: 'login_required',
+    updatedAt: 'not-a-date',
+    freshness: {
+      staleAfterSeconds: 360,
+    },
   });
 
   expect(result.success).toBe(false);
@@ -116,7 +182,7 @@ it('rejects an unknown status', () => {
 
 **Step 3: Run the tests**
 
-Run: `cd port/core && npm test`
+Run: `cd port/core && npm run test:contracts -- state-contract.test.ts`
 
 Expected: PASS
 
@@ -140,9 +206,13 @@ git commit -m "feat: add shared battery state schema"
 
 Create separate schemas for:
 
+- selected-account metadata
 - session state
-- usage metrics
+- weekly usage state
+- freshness metadata
 - auth and API errors
+
+Keep deferred parity fields out of the required runtime contract for now, but document them explicitly so later plans can add them without redefining the MVP shape.
 
 **Step 2: Add tests for optional but structured fields**
 
@@ -154,13 +224,23 @@ expect(batteryStateSchema.parse({
   error: {
     kind: 'rate_limited',
     message: 'Rate limited',
+    retryAfterSeconds: 30,
+  },
+  freshness: {
+    staleAfterSeconds: 360,
   },
 })).toBeDefined();
 ```
 
+Also add tests that:
+
+- reject `weekly` when `resetsAt` is not an ISO timestamp
+- allow deferred parity fields such as `opus`, `sonnet`, and `extraUsage` to remain absent in MVP
+- reject unknown error kinds
+
 **Step 3: Run the tests**
 
-Run: `cd port/core && npm test`
+Run: `cd port/core && npm run test:contracts`
 
 Expected: PASS
 
@@ -185,10 +265,15 @@ The GNOME extension may safely rely on:
 
 - `status`
 - `updatedAt`
+- `account.id`
+- `account.name`
+- `account.planTier`
 - `session.utilization`
 - `session.resetsAt`
 - `session.isActive`
 - `weekly.utilization`
+- `weekly.resetsAt`
+- `freshness.staleAfterSeconds`
 - `error.kind`
 ```
 
@@ -197,6 +282,9 @@ The GNOME extension may safely rely on:
 ```md
 - Increment `version` only for breaking changes
 - Additive fields must be optional first
+- The MVP contract represents one selected account only
+- Deferred parity fields are tracked separately until they are implemented
+- The extension must treat state older than the freshness window as stale
 ```
 
 **Step 3: Commit**

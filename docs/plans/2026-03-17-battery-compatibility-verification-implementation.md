@@ -16,6 +16,7 @@
 - Create: `port/core/test/compat/compat-test-harness.ts`
 - Create: `port/core/test/compat/session-parity.test.ts`
 - Create: `port/core/test/compat/usage-parity.test.ts`
+- Create: `port/core/test/compat/contract-parity.test.ts`
 - Modify: `port/core/package.json`
 
 **Step 1: Add a focused compat test script**
@@ -58,14 +59,17 @@ git add port/core
 git commit -m "test: add compatibility verification harness"
 ```
 
-### Task 2: Add session and usage parity fixtures
+### Task 2: Add session, usage, and contract parity fixtures
 
 **Files:**
 - Create: `port/fixtures/compat/session/start-stop.expected.json`
 - Create: `port/fixtures/compat/session/idle-timeout.expected.json`
 - Create: `port/fixtures/compat/usage/sample-200.expected.json`
+- Create: `port/fixtures/compat/contract/ok-state.expected.json`
+- Create: `port/fixtures/compat/contract/login-required.expected.json`
 - Modify: `port/core/test/compat/session-parity.test.ts`
 - Modify: `port/core/test/compat/usage-parity.test.ts`
+- Modify: `port/core/test/compat/contract-parity.test.ts`
 
 **Step 1: Write expected outputs from the parity inventory**
 
@@ -84,6 +88,16 @@ Example expected session file:
 expect(state).toMatchObject(expected);
 ```
 
+For contract parity, compare the emitted `pollOnce` result against expected JSON and assert that the final state also parses with `batteryStateSchema`.
+
+The MVP contract fixture set must cover:
+
+- selected-account metadata
+- `updatedAt`
+- weekly state
+- `freshness.staleAfterSeconds`
+- login-required output when no usable account or tokens are present
+
 **Step 3: Run compatibility tests**
 
 Run: `cd port/core && npm run test:compat`
@@ -94,7 +108,7 @@ Expected: PASS
 
 ```bash
 git add port/core port/fixtures/compat
-git commit -m "test: add session and usage parity fixtures"
+git commit -m "test: add session, usage, and contract parity fixtures"
 ```
 
 ### Task 3: Add error and auth behavior parity tests
@@ -102,6 +116,8 @@ git commit -m "test: add session and usage parity fixtures"
 **Files:**
 - Create: `port/fixtures/compat/errors/unauthorized.expected.json`
 - Create: `port/fixtures/compat/errors/rate-limited.expected.json`
+- Create: `port/fixtures/compat/errors/refresh-after-401.expected.json`
+- Create: `port/fixtures/compat/errors/no-refresh-token.expected.json`
 - Create: `port/core/test/compat/error-parity.test.ts`
 
 **Step 1: Add tests that lock in Swift-style API error mapping**
@@ -121,6 +137,65 @@ await expect(fetchUsage(fetch429, 'token')).rejects.toMatchObject({
 });
 ```
 
+**Step 3: Add auth lifecycle parity checks**
+
+Verify parity for:
+
+- refresh-near-expiry before polling
+- forced refresh after `401` when a refresh token exists
+- login-required output when refresh is impossible
+
+Example:
+
+```ts
+const state = await pollOnce({ fetchImpl, refreshFetchImpl, now, homeDir });
+
+expect(state).toMatchObject({
+  status: 'ok',
+  account: { isSelected: true },
+});
+```
+
+**Step 4: Run compatibility tests**
+
+Run: `cd port/core && npm run test:compat`
+
+Expected: PASS
+
+**Step 5: Commit**
+
+```bash
+git add port/core port/fixtures/compat/errors
+git commit -m "test: lock in swift auth and error parity"
+```
+
+### Task 4: Add session and usage edge-case parity tests
+
+**Files:**
+- Create: `port/fixtures/compat/session/malformed-line-ignored.expected.json`
+- Create: `port/fixtures/compat/session/oversized-line-ignored.expected.json`
+- Create: `port/fixtures/compat/session/startup-replay.expected.json`
+- Modify: `port/core/test/compat/session-parity.test.ts`
+- Modify: `port/core/test/compat/usage-parity.test.ts`
+
+**Step 1: Add the session edge-case fixtures from the parity inventory**
+
+Cover:
+
+- startup replay from recent events
+- malformed event lines ignored
+- oversized event lines ignored
+
+**Step 2: Extend usage parity assertions**
+
+Lock in the MVP-required usage fields only:
+
+- session utilization and reset time
+- weekly utilization and reset time
+- plan tier when present
+
+Do not require deferred fields such as `opus`, `sonnet`, or `extraUsage` in MVP compat tests.
+
 **Step 3: Run compatibility tests**
 
 Run: `cd port/core && npm run test:compat`
@@ -130,11 +205,11 @@ Expected: PASS
 **Step 4: Commit**
 
 ```bash
-git add port/core port/fixtures/compat/errors
-git commit -m "test: lock in swift error parity"
+git add port/core port/fixtures/compat
+git commit -m "test: add session and usage edge-case parity coverage"
 ```
 
-### Task 4: Add the parity checklist report
+### Task 5: Add the parity checklist report
 
 **Files:**
 - Create: `port/fixtures/compat/PARITY_CHECKLIST.md`
@@ -144,12 +219,19 @@ git commit -m "test: lock in swift error parity"
 ```md
 # Parity Checklist
 
+- [ ] Contract output parses with `batteryStateSchema`
+- [ ] Selected-account metadata is preserved
+- [ ] Login-required state when account or tokens are missing
 - [ ] Session activity inference
+- [ ] Startup replay from recent events
 - [ ] Idle timeout handling
 - [ ] Unauthorized error mapping
+- [ ] Forced refresh after `401`
 - [ ] Rate limit retry-after mapping
 - [ ] Session utilization normalization
 - [ ] Weekly utilization normalization
+- [ ] `updatedAt` and freshness semantics
+- [ ] Plan tier parity when present
 ```
 
 **Step 2: Update the checklist only when a compat test exists and passes**
@@ -158,6 +240,12 @@ Add a rule at the top of the file:
 
 ```md
 Only check an item when there is an automated test covering it.
+```
+
+Also add one note:
+
+```md
+Deferred fields such as `opus`, `sonnet`, `extraUsage`, and projection behavior stay unchecked until those domains enter the Linux MVP contract.
 ```
 
 **Step 3: Commit**

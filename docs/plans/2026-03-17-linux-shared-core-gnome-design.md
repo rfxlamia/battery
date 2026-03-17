@@ -51,6 +51,30 @@ The current Swift project also contains macOS-only shell concerns that should no
 - Do not publish to extensions.gnome.org in the first phase
 - Do not create one giant implementation plan that mixes every migration concern together
 
+## MVP Parity Boundary
+
+The Linux MVP must preserve the Swift behaviors that directly affect top-bar status, polling cadence, and user trust. It does not need to ship every analytical or multi-account feature from the macOS app on day one.
+
+Required parity for MVP:
+
+- login-required, loading, ok, and error states
+- session utilization and session reset time
+- weekly utilization and weekly reset time
+- hook-driven active-session inference, including startup replay, `SessionEnd` precedence, recent activity handling, and the existing five-minute idle timeout
+- adaptive polling behavior equivalent to the current Swift product intent: faster polling during active sessions and slower polling while idle
+- API error mapping for `401`, `429`, and generic server or decoding failures, including retry-after semantics
+- plan tier, last-updated metadata, and enough freshness metadata for the GNOME extension to detect stale state safely
+- atomic local state output for one selected account
+
+Deferred until after MVP:
+
+- Sonnet and Opus breakdowns
+- extra usage credits and monthly limits
+- burn-rate projections, streaks, heatmaps, and historical charts
+- multi-account switching UI and an account-list contract
+
+Deferred fields must be called out explicitly in the shared contract so the GNOME extension can treat them as absent rather than unstable.
+
 ## Recommended Architecture
 
 ### 1. Swift remains the behavioral oracle
@@ -75,6 +99,15 @@ Create a Linux-focused runtime in TypeScript that is responsible for:
 - exposing a stable local state contract for frontends
 
 This layer is the engine. It should be maintainable by the user and portable to future Linux surfaces.
+
+For Linux MVP, the core should continue using the shared `~/.battery/` root so hook events, tokens, cached state, and compatibility artifacts do not split across multiple local conventions.
+
+Auth and account rules for MVP:
+
+- Battery-owned auth files remain under `~/.battery/`
+- if existing Battery account metadata or token files are present, the Linux core should reuse them rather than inventing a second auth store
+- the emitted frontend contract represents one selected account end-to-end in MVP
+- multi-account parity remains a post-MVP expansion, not a hidden requirement in the first GNOME delivery
 
 ### 3. GNOME extension as a thin UI shell
 
@@ -102,6 +135,19 @@ For the first phase, the recommended delivery path is:
 - installer script that copies the extension into the user GNOME extension directory, enables it, and wires up the local core
 
 Publishing to the GNOME extension store can be evaluated later.
+
+## Runtime Ownership
+
+The GNOME extension should not be responsible for starting, supervising, or reimplementing the core runtime.
+
+For the installed GNOME MVP:
+
+- the TypeScript core runs as a user-scoped background service
+- the preferred installed path is a `systemd --user` service on GNOME-capable Linux systems
+- the installer enables that user service as part of setup
+- development may still use a manual foreground command, but the production path must not depend on the extension spawning the backend ad hoc
+
+This keeps the extension thin, makes stale-backend failures easier to detect, and avoids duplicating polling or auth logic in shell code.
 
 ## Repository Layout
 
@@ -138,6 +184,13 @@ The intended runtime flow is:
 
 For the first usable version, a local state file is sufficient. If needed later, this can be upgraded to a stronger IPC layer such as D-Bus.
 
+For MVP, the file contract must also define freshness and safety rules:
+
+- state writes must be atomic so the extension never reads partial JSON
+- the state object must include `updatedAt`
+- the extension must treat the state as stale when it is older than the expected idle polling window by a clearly documented margin
+- stale state must render as an explicit stale or error presentation rather than being shown as live data
+
 ## Why TypeScript
 
 TypeScript is the recommended shared-core language because:
@@ -165,6 +218,15 @@ Recommended approach:
 
 This reduces the risk of drifting away from the proven Swift implementation.
 
+Plan dependency rules:
+
+- Plan A is required before Plan B starts
+- Plan B is required before Plan C starts
+- Plan C is required before Plan D starts
+- Plan D must cover the critical MVP parity domains before Plan E begins implementation
+- Plan E may add GNOME-specific presentation details, but it must not redefine shared behavior already locked by Plans A through D
+- Plan F remains optional and may improve packaging or ergonomics only after the installed MVP path works
+
 ## Domain-Focused Plan Breakdown
 
 The migration should be implemented through several separate plans:
@@ -190,10 +252,11 @@ Purpose:
 
 Outputs:
 
-- state schema
+- versioned state schema for one selected account in MVP
 - error schema
-- account and session state schema
-- update semantics
+- session and weekly state schema
+- update and freshness semantics
+- deferred-fields list for post-MVP parity
 
 ### Plan C: TypeScript Core MVP
 
@@ -208,6 +271,7 @@ Outputs:
 - polling pipeline
 - hook event reader
 - persisted state output
+- installed user-service path for GNOME MVP
 
 ### Plan D: Compatibility Verification
 
@@ -232,19 +296,20 @@ Outputs:
 - indicator in the GNOME top bar
 - popup summary
 - login-needed and error states
+- stale-core-state handling
 - manual refresh support
 
 ### Optional Future Plan F: Linux Packaging and Service Lifecycle
 
 Purpose:
 
-- improve install, startup, and upgrade ergonomics after MVP
+- improve packaging, distribution, and upgrade ergonomics after MVP
 
 Possible outputs:
 
-- installer improvements
-- autostart or service management
-- packaging strategy
+- distro-specific packaging
+- GNOME extension store publishing work
+- installer improvements beyond the MVP service flow
 
 ## Risks
 
