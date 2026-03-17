@@ -1,1 +1,2 @@
-// Contracts will be exported here once implemented
+export { batteryStateSchema } from './state.js';
+export type { BatteryState } from './state.js';
