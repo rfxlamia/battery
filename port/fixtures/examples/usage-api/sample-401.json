@@ -1,0 +1,8 @@
+{
+  "_note": "HTTP 401 response. Triggers force-refresh flow in UsagePollingService.",
+  "_http_status": 401,
+  "error": {
+    "type": "authentication_error",
+    "message": "Unauthorized (401). Token may be expired."
+  }
+}

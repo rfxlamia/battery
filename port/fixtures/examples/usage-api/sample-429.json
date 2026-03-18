@@ -1,0 +1,14 @@
+{
+  "_note": "HTTP 429 response. Headers will include Retry-After (seconds) and rate-limit headers.",
+  "_http_status": 429,
+  "_headers": {
+    "Retry-After": "60",
+    "x-ratelimit-limit-requests": "10",
+    "x-ratelimit-remaining-requests": "0",
+    "x-ratelimit-reset-requests": "2026-03-17T08:01:00Z"
+  },
+  "error": {
+    "type": "rate_limit_error",
+    "message": "Rate limit exceeded. Please retry after 60 seconds."
+  }
+}
