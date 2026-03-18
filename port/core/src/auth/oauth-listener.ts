@@ -80,6 +80,8 @@ export async function startOAuthListener(
   const stop = (): Promise<void> =>
     new Promise((resolve) => {
       clearTimeout(timeout);
+      // Reject any caller still awaiting codePromise so they don't hang.
+      rejectCode(new Error('OAuth listener stopped'));
       // Server may already be closed if code was received; close() on an
       // already-closed server fires the callback immediately.
       server.close(() => resolve());

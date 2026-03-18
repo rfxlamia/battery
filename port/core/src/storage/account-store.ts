@@ -122,7 +122,12 @@ export interface StoredAccountRecord {
 function isStoredAccountRecord(v: unknown): v is StoredAccountRecord {
   if (typeof v !== 'object' || v === null) return false;
   const r = v as Record<string, unknown>;
-  return typeof r['id'] === 'string' && typeof r['name'] === 'string';
+  return (
+    typeof r['id'] === 'string' &&
+    typeof r['name'] === 'string' &&
+    typeof r['planTier'] === 'string' &&
+    typeof r['isDefault'] === 'boolean'
+  );
 }
 
 export async function readAllAccounts(homeDir: string): Promise<StoredAccountRecord[]> {

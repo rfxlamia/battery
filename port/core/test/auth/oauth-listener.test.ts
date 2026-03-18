@@ -26,6 +26,7 @@ describe('startOAuthListener', () => {
     );
     expect(res.status).toBe(400);
     await listener.stop();
+    await expect(listener.codePromise).rejects.toThrow();
   });
 
   it('accepts callback with matching state', async () => {

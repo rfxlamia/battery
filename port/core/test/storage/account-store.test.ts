@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readSelectedAccount } from '../../src/storage/account-store.js';
+import { readSelectedAccount, readAllAccounts } from '../../src/storage/account-store.js';
 
 describe('readSelectedAccount', () => {
   let tmpDir: string;
@@ -88,6 +88,19 @@ describe('readSelectedAccount', () => {
 
     const account = await readSelectedAccount(tmpDir);
     expect(account).toMatchObject({ id: 'acct-2' });
+  });
+
+  it('filters out PortableStoredAccount entries from readAllAccounts (they lack isDefault)', async () => {
+    await writeFile(
+      join(tmpDir, '.battery', 'accounts.json'),
+      JSON.stringify([
+        { id: 'acct-1', name: 'OldPortable', planTier: 'pro', selected: true },
+        { id: 'acct-2', name: 'NewSwift', planTier: 'max', isDefault: true, email: null, createdAt: '2026-01-01T00:00:00.000Z' },
+      ]),
+    );
+    const accounts = await readAllAccounts(tmpDir);
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0]).toMatchObject({ id: 'acct-2' });
   });
 
   it('falls back to the Swift default when mixed-format accounts have no portable selection', async () => {
