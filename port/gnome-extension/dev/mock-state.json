@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "status": "ok",
+  "updatedAt": "2026-03-17T00:00:00.000Z",
+  "account": {
+    "id": "acct-mock",
+    "name": "Alice",
+    "planTier": "pro",
+    "isSelected": true
+  },
+  "session": {
+    "utilization": 0.42,
+    "resetsAt": "2026-03-17T01:18:00.000Z",
+    "isActive": true
+  },
+  "weekly": {
+    "utilization": 0.31,
+    "resetsAt": "2026-03-21T00:00:00.000Z"
+  },
+  "freshness": {
+    "staleAfterSeconds": 360
+  }
+}

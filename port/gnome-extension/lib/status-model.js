@@ -2,6 +2,7 @@
  * Pure status model helpers — no GNOME Shell dependencies.
  * Maps Battery state contract fields to display strings.
  */
+import { formatResetTime } from './time-format.js';
 
 /**
  * Returns the top-bar indicator label for a given Battery state.
@@ -44,26 +45,6 @@ export function isStale(updatedAt, freshness, now) {
   const updated = new Date(updatedAt);
   if (isNaN(updated.getTime())) return false;
   return (now.getTime() - updated.getTime()) / 1000 > freshness.staleAfterSeconds;
-}
-
-/**
- * Returns a human-readable reset countdown (e.g. "1h 18m") or null.
- *
- * @param {string|null|undefined} resetsAt
- * @param {Date} now
- * @returns {string|null}
- */
-export function formatResetTime(resetsAt, now) {
-  if (!resetsAt) return null;
-  const reset = new Date(resetsAt);
-  if (isNaN(reset.getTime())) return null;
-  const diffMs = reset.getTime() - now.getTime();
-  if (diffMs <= 0) return null;
-  const totalMinutes = Math.floor(diffMs / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
 }
 
 /**
