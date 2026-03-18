@@ -1,18 +1,13 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadExpected } from './compat-test-harness.js';
+import { loadExpected, SAMPLE_200_RAW } from './compat-test-harness.js';
 import { pollOnce } from '../../src/runtime/poll-once.js';
 import { batteryStateSchema } from '../../src/contracts/index.js';
 
-const sample200 = {
-  five_hour: { utilization: 42.5, resets_at: '2026-03-17T13:00:00Z' },
-  seven_day: { utilization: 61.2, resets_at: '2026-03-23T00:00:00Z' },
-};
-
 const mockFetch200 = async () =>
-  new Response(JSON.stringify(sample200), { status: 200 });
+  new Response(JSON.stringify(SAMPLE_200_RAW), { status: 200 });
 
 describe('contract parity', () => {
   let homeDir: string;
@@ -38,6 +33,10 @@ describe('contract parity', () => {
       }),
       { mode: 0o600 },
     );
+  });
+
+  afterEach(async () => {
+    await rm(homeDir, { recursive: true, force: true });
   });
 
   it('ok state matches expected contract shape and validates with batteryStateSchema', async () => {

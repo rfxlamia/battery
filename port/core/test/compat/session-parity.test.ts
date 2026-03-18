@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadHookFixture, loadExpected } from './compat-test-harness.js';
@@ -63,6 +63,7 @@ describe('session parity', () => {
     const state = reduceSessionState(events, nowMs);
 
     expect(state).toMatchObject(expected);
+    await rm(homeDir, { recursive: true, force: true });
   });
 
   it('ignores oversized lines in events file', async () => {
@@ -88,6 +89,7 @@ describe('session parity', () => {
     const state = reduceSessionState(events, nowMs);
 
     expect(state).toMatchObject(expected);
+    await rm(homeDir, { recursive: true, force: true });
   });
 
   it('activates session from PostToolUse without prior SessionStart (startup replay)', async () => {

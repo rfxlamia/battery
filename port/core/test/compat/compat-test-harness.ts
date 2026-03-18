@@ -33,13 +33,13 @@ export async function loadHookFixture(
 }
 
 /**
- * Load a JSON fixture file for usage-api responses.
+ * Shared mock API response matching port/fixtures/examples/usage-api/sample-200.json.
+ * Centralised here so parity tests stay DRY.
  */
-export async function loadUsageFixture(relativePath: string): Promise<unknown> {
-  const filePath = join(FIXTURES_ROOT, 'examples', 'usage-api', relativePath);
-  const raw = await readFile(filePath, 'utf-8');
-  return JSON.parse(raw);
-}
+export const SAMPLE_200_RAW = {
+  five_hour: { utilization: 42.5, resets_at: '2026-03-17T13:00:00Z' },
+  seven_day: { utilization: 61.2, resets_at: '2026-03-23T00:00:00Z' },
+};
 
 /**
  * Load an expected-output JSON fixture from the compat directory.

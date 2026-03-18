@@ -1,16 +1,12 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadExpected } from './compat-test-harness.js';
+import { loadExpected, SAMPLE_200_RAW } from './compat-test-harness.js';
 import { fetchUsage } from '../../src/api/anthropic-api.js';
 import { pollOnce } from '../../src/runtime/poll-once.js';
 import { batteryStateSchema } from '../../src/contracts/index.js';
-
-const sample200 = {
-  five_hour: { utilization: 42.5, resets_at: '2026-03-17T13:00:00Z' },
-  seven_day: { utilization: 61.2, resets_at: '2026-03-23T00:00:00Z' },
-};
+import { ANTHROPIC_API_BASE_URL } from '../../src/config/env.js';
 
 describe('error parity', () => {
   it('maps 401 to unauthorized error kind', async () => {
@@ -54,6 +50,10 @@ describe('auth lifecycle parity', () => {
     );
   });
 
+  afterEach(async () => {
+    await rm(homeDir, { recursive: true, force: true });
+  });
+
   it('force-refreshes after 401 and retries successfully', async () => {
     const expected = await loadExpected<{ status: string }>('errors/refresh-after-401.expected.json');
 
@@ -68,10 +68,11 @@ describe('auth lifecycle parity', () => {
       { mode: 0o600 },
     );
 
+    const oauthTokenUrl = `${ANTHROPIC_API_BASE_URL}/oauth/token`;
     let callCount = 0;
     const fetchImpl = async (url: string, init?: RequestInit) => {
       // Token refresh endpoint
-      if (typeof url === 'string' && url.includes('/oauth/token')) {
+      if (url === oauthTokenUrl) {
         return new Response(
           JSON.stringify({
             access_token: 'fresh-token',
@@ -90,7 +91,7 @@ describe('auth lifecycle parity', () => {
           { status: 401 },
         );
       }
-      return new Response(JSON.stringify(sample200), { status: 200 });
+      return new Response(JSON.stringify(SAMPLE_200_RAW), { status: 200 });
     };
 
     const state = await pollOnce({
@@ -149,8 +150,9 @@ describe('auth lifecycle parity', () => {
       { mode: 0o600 },
     );
 
+    const oauthTokenUrl = `${ANTHROPIC_API_BASE_URL}/oauth/token`;
     const fetchImpl = async (url: string) => {
-      if (typeof url === 'string' && url.includes('/oauth/token')) {
+      if (url === oauthTokenUrl) {
         return new Response(
           JSON.stringify({
             access_token: 'refreshed-token',
@@ -160,7 +162,7 @@ describe('auth lifecycle parity', () => {
           { status: 200 },
         );
       }
-      return new Response(JSON.stringify(sample200), { status: 200 });
+      return new Response(JSON.stringify(SAMPLE_200_RAW), { status: 200 });
     };
 
     const state = await pollOnce({
