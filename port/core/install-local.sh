@@ -23,12 +23,12 @@ if [[ -z "$NODE_BIN" ]]; then
   exit 1
 fi
 
-cat > "$TARGET_DIR/run-battery-core.sh" <<EOF
+cat > "$TARGET_DIR/battery-core.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-exec "$NODE_BIN" "$TARGET_DIR/dist/main.js" --loop
+exec "$NODE_BIN" "$TARGET_DIR/dist/main.js" "\$@"
 EOF
-chmod +x "$TARGET_DIR/run-battery-core.sh"
+chmod +x "$TARGET_DIR/battery-core.sh"
 
 cp systemd/battery-core.service "$UNIT_DIR"/battery-core.service
 

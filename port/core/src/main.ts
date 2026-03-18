@@ -2,13 +2,21 @@
 import { getHomeDir } from './config/env.js';
 import { pollOnce } from './runtime/poll-once.js';
 import { runLoop } from './runtime/run-loop.js';
+import { parseBatteryCommand } from './cli/command-router.js';
+
+async function runLoginCommand(): Promise<void> {
+  throw new Error('not implemented yet');
+}
 
 async function main(): Promise<void> {
   const homeDir = getHomeDir();
+  const command = parseBatteryCommand(process.argv.slice(2));
 
-  if (process.argv.includes('--loop')) {
+  if (command.kind === 'loop') {
     // Long-running mode for systemd --user service
     await runLoop(homeDir);
+  } else if (command.kind === 'login') {
+    await runLoginCommand();
   } else {
     // Single poll — emit state and exit (for scripts and testing)
     const state = await pollOnce({ fetchImpl: fetch, now: Date.now(), homeDir });

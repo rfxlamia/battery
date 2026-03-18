@@ -20,7 +20,7 @@ describe('local installer paths', () => {
 
   it('ships a systemd unit that points at the launcher script path', async () => {
     const unit = await readFile(join(coreDir, 'systemd', 'battery-core.service'), 'utf8');
-    expect(unit).toContain('ExecStart=%h/.local/share/battery/core/run-battery-core.sh');
+    expect(unit).toContain('ExecStart=%h/.local/share/battery/core/battery-core.sh --loop');
   });
 
   it('creates the launcher script and user unit in a temp home during install', async () => {
@@ -72,7 +72,7 @@ describe('local installer paths', () => {
       },
     });
 
-    const launcherPath = join(fakeHome, '.local', 'share', 'battery', 'core', 'run-battery-core.sh');
+    const launcherPath = join(fakeHome, '.local', 'share', 'battery', 'core', 'battery-core.sh');
     const unitPath = join(fakeHome, '.config', 'systemd', 'user', 'battery-core.service');
     const launcher = await readFile(launcherPath, 'utf8');
     const unit = await readFile(unitPath, 'utf8');
@@ -80,7 +80,7 @@ describe('local installer paths', () => {
     const systemctlLog = (await readFile(systemctlLogPath, 'utf8')).trim().split('\n');
 
     expect(launcher).toContain('dist/main.js');
-    expect(unit).toContain('ExecStart=%h/.local/share/battery/core/run-battery-core.sh');
+    expect(unit).toContain('ExecStart=%h/.local/share/battery/core/battery-core.sh --loop');
     expect(npmLog).toEqual([
       'ci',
       'run build',

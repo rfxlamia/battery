@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/share/battery/core/run-battery-core.sh
+ExecStart=%h/.local/share/battery/core/battery-core.sh --loop
 Restart=on-failure
 RestartSec=10
 Environment=HOME=%h
