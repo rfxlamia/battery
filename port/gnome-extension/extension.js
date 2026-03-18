@@ -63,8 +63,12 @@ class BatteryIndicator extends PanelMenu.Button {
       if (!ok) return { _localStateStatus: 'missing' };
       const rawJson = new TextDecoder().decode(contents);
       return parseStateJson(rawJson) ?? { _localStateStatus: 'invalid' };
-    } catch {
-      return { _localStateStatus: 'missing' };
+    } catch (error) {
+      const message = String(error).toLowerCase();
+      if (message.includes('no such file') || message.includes('not found')) {
+        return { _localStateStatus: 'missing' };
+      }
+      return { _localStateStatus: 'invalid' };
     }
   }
 
