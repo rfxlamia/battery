@@ -18,8 +18,24 @@ The installer will:
 - reload the user daemon
 - enable and start `battery-core.service`
 
+## Sign in
+
+After installing, sign in to Claude:
+
+```bash
+~/.local/share/battery/core/battery-core.sh login
+```
+
+This opens a browser for OAuth. After completing, the following files are written:
+
+- `~/.battery/accounts.json`
+- `~/.battery/selected-account-id`
+- `~/.battery/tokens/*.json`
+- `~/.battery/state.json`
+
 ## Verify
 
 ```bash
 systemctl --user status battery-core.service
+cat ~/.battery/state.json
 ```
