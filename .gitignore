@@ -33,3 +33,6 @@ events.jsonl
 # Node.js
 node_modules/
 dist/
+
+# Worktrees
+.worktrees/
