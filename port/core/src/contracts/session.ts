@@ -1,10 +1,13 @@
 import { z } from 'zod';
-
-const isoDateTime = z.string().datetime({ offset: true });
+import { isoDateTime } from './primitives.js';
 
 /**
  * Represents the selected account context for a Battery state snapshot.
  * Only one account is selected at any given time in the MVP contract.
+ *
+ * Note: `isSelected` is constrained to `true` as a contract invariant — the
+ * core only emits the single active account. It is not a filterable property;
+ * unselected accounts are never included in the state snapshot.
  */
 export const accountSchema = z.object({
   id: z.string(),
@@ -17,9 +20,11 @@ export const accountSchema = z.object({
  * Active session usage within the current billing window.
  * Deferred parity fields (opus, sonnet, extraUsage) are tracked separately
  * and must remain absent in the MVP shape.
+ *
+ * `utilization` is a non-negative number. Values above 1.0 represent overrun.
  */
 export const sessionSchema = z.object({
-  utilization: z.number(),
+  utilization: z.number().min(0),
   resetsAt: isoDateTime.nullable(),
   isActive: z.boolean(),
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batteryStateSchema, errorSchema, weeklySchema } from '../../src/contracts/index.js';
+import { batteryStateSchema, errorSchema, sessionSchema, weeklySchema } from '../../src/contracts/index.js';
 
 describe('error state', () => {
   it('accepts a rate_limited error with retryAfterSeconds', () => {
@@ -51,6 +51,61 @@ describe('weekly schema', () => {
     const result = weeklySchema.safeParse({
       utilization: 0.5,
       resetsAt: null,
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('status/error invariant', () => {
+  it('rejects status error without an error field', () => {
+    const result = batteryStateSchema.safeParse({
+      version: 1,
+      status: 'error',
+      updatedAt: '2026-03-17T00:00:00.000Z',
+      freshness: { staleAfterSeconds: 360 },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts status ok without an error field', () => {
+    const result = batteryStateSchema.safeParse({
+      version: 1,
+      status: 'ok',
+      updatedAt: '2026-03-17T00:00:00.000Z',
+      freshness: { staleAfterSeconds: 360 },
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('utilization bounds', () => {
+  it('rejects negative session utilization', () => {
+    const result = sessionSchema.safeParse({
+      utilization: -0.1,
+      resetsAt: null,
+      isActive: true,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects negative weekly utilization', () => {
+    const result = weeklySchema.safeParse({
+      utilization: -1,
+      resetsAt: null,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts overrun utilization above 1.0', () => {
+    const result = sessionSchema.safeParse({
+      utilization: 1.5,
+      resetsAt: null,
+      isActive: true,
     });
 
     expect(result.success).toBe(true);

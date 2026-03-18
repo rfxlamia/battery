@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { batteryStateSchema } from '../../src/contracts/index.js';
+import type { BatteryState } from '../../src/contracts/index.js';
 
 describe('batteryStateSchema', () => {
   it('accepts the minimal disconnected state', () => {
@@ -67,5 +68,31 @@ describe('batteryStateSchema', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('BatteryState type shape', () => {
+  it('has required top-level fields', () => {
+    expectTypeOf<BatteryState>().toHaveProperty('version');
+    expectTypeOf<BatteryState>().toHaveProperty('status');
+    expectTypeOf<BatteryState>().toHaveProperty('updatedAt');
+    expectTypeOf<BatteryState>().toHaveProperty('freshness');
+  });
+
+  it('has optional domain fields', () => {
+    expectTypeOf<BatteryState['account']>().toBeNullable();
+    expectTypeOf<BatteryState['session']>().toBeNullable();
+    expectTypeOf<BatteryState['weekly']>().toBeNullable();
+    expectTypeOf<BatteryState['error']>().toBeNullable();
+  });
+
+  it('status is a union of known values', () => {
+    expectTypeOf<BatteryState['status']>().toEqualTypeOf<
+      'ok' | 'loading' | 'login_required' | 'error'
+    >();
+  });
+
+  it('version is literal 1', () => {
+    expectTypeOf<BatteryState['version']>().toEqualTypeOf<1>();
   });
 });

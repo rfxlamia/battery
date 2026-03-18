@@ -1,9 +1,8 @@
 import { z } from 'zod';
+import { isoDateTime } from './primitives.js';
 import { accountSchema, sessionSchema } from './session.js';
 import { weeklySchema, freshnessSchema } from './usage.js';
 import { errorSchema } from './errors.js';
-
-const isoDateTime = z.string().datetime({ offset: true });
 
 export const batteryStateSchema = z.object({
   version: z.literal(1),
@@ -14,6 +13,9 @@ export const batteryStateSchema = z.object({
   weekly: weeklySchema.optional(),
   freshness: freshnessSchema,
   error: errorSchema.optional(),
-});
+}).refine(
+  (data) => data.status !== 'error' || data.error !== undefined,
+  { message: "error field is required when status is 'error'" },
+);
 
 export type BatteryState = z.infer<typeof batteryStateSchema>;

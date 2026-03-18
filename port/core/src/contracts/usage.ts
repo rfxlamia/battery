@@ -1,14 +1,15 @@
 import { z } from 'zod';
-
-const isoDateTime = z.string().datetime({ offset: true });
+import { isoDateTime } from './primitives.js';
 
 /**
  * Rolling weekly usage window.
  * Deferred parity fields (opus, sonnet, extraUsage) are tracked separately
  * and must remain absent in the MVP shape.
+ *
+ * `utilization` is a non-negative number. Values above 1.0 represent overrun.
  */
 export const weeklySchema = z.object({
-  utilization: z.number(),
+  utilization: z.number().min(0),
   resetsAt: isoDateTime.nullable(),
 });
 
