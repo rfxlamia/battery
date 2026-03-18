@@ -16,3 +16,5 @@ export const OAUTH_SCOPES =
   process.env['BATTERY_OAUTH_SCOPES'] ?? 'user:profile user:inference';
 export const OAUTH_TOKEN_URL =
   process.env['BATTERY_OAUTH_TOKEN_URL'] ?? 'https://platform.claude.com/v1/oauth/token';
+export const OAUTH_AUTHORIZE_URL =
+  process.env['BATTERY_OAUTH_AUTHORIZE_URL'] ?? 'https://claude.ai/oauth/authorize';
