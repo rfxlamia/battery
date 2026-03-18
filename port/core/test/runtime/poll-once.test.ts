@@ -48,8 +48,10 @@ describe('pollOnce', () => {
     const state = await pollOnce({ fetchImpl: mockFetch200 as typeof fetch, now, homeDir });
 
     expect(state.status).toBe('ok');
-    expect(state.session?.utilization).toBeGreaterThanOrEqual(0);
-    expect(state.weekly?.utilization).toBeGreaterThanOrEqual(0);
+    // fixture: five_hour.utilization=42.5 → normalized to 0.425
+    expect(state.session?.utilization).toBe(0.425);
+    // fixture: seven_day.utilization=61.2 → normalized to 0.612
+    expect(state.weekly?.utilization).toBeCloseTo(0.612, 5);
     expect(state.account?.isSelected).toBe(true);
     expect(state.freshness.staleAfterSeconds).toBeGreaterThan(0);
 

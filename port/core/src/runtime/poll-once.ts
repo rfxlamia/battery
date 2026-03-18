@@ -1,4 +1,4 @@
-import type { BatteryState } from '../contracts/index.js';
+import { batteryStateSchema, type BatteryState } from '../contracts/index.js';
 import { readSelectedAccount } from '../storage/account-store.js';
 import { readTokens, writeTokens } from '../storage/token-store.js';
 import { writeStateFile } from '../storage/state-store.js';
@@ -104,8 +104,8 @@ export async function pollOnce(deps: PollDeps): Promise<BatteryState> {
   const events = await readRecentEvents(homeDir, now);
   const session = reduceSessionState(events, now);
 
-  // 6. Build normalized state
-  const state = buildOkState(account, usage, session, now);
+  // 6. Build and validate normalized state against the shared contract
+  const state = batteryStateSchema.parse(buildOkState(account, usage, session, now));
 
   // 7. Write state.json
   await writeStateFile(homeDir, state);

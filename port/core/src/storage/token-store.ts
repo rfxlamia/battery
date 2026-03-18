@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, chmod } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export interface StoredTokens {
@@ -32,5 +32,4 @@ export async function writeTokens(
   await mkdir(tokensDir, { recursive: true });
   const tokenPath = join(tokensDir, `${accountId}.json`);
   await writeFile(tokenPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
-  await chmod(tokenPath, 0o600);
 }

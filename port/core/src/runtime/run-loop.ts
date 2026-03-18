@@ -1,5 +1,4 @@
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
 import { pollOnce } from './poll-once.js';
 import type { BatteryState } from '../contracts/index.js';
 

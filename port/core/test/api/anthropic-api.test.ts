@@ -23,7 +23,7 @@ const fetchMock429 = async () =>
 const fetchMock500 = async () => new Response('Internal Server Error', { status: 500 });
 
 describe('fetchUsage', () => {
-  it('returns normalized usage data on 200', async () => {
+  it('returns raw usage data on 200 (normalisation is build-state responsibility)', async () => {
     const result = await fetchUsage(fetchMock200, 'valid-token');
     expect(result).toMatchObject({
       fiveHour: expect.objectContaining({ utilization: 42.5 }) as unknown,

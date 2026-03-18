@@ -48,13 +48,17 @@ export async function fetchUsage(
   }
 
   if (response.status === 401) {
-    throw makeApiError('unauthorized', 'Unauthorized — token may be expired') as ApiError;
+    throw makeApiError('unauthorized', 'Unauthorized — token may be expired');
   }
 
   if (response.status === 429) {
     const retryAfterHeader = response.headers.get('Retry-After');
     const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : undefined;
-    throw makeApiError('rate_limited', 'Rate limit exceeded', { retryAfterSeconds });
+    throw makeApiError(
+      'rate_limited',
+      'Rate limit exceeded',
+      retryAfterSeconds !== undefined ? { retryAfterSeconds } : {},
+    );
   }
 
   if (!response.ok) {

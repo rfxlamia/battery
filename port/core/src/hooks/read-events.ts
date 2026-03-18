@@ -72,10 +72,8 @@ export async function readRecentEvents(homeDir: string, nowMs: number): Promise<
     events.push({
       event: parsed.event,
       timestamp: parsed.timestamp,
-      sessionId: parsed.sessionId
-        ? String(parsed.sessionId).slice(0, SESSION_ID_MAX_LEN)
-        : undefined,
-      tool: parsed.tool ? String(parsed.tool).slice(0, TOOL_MAX_LEN) : undefined,
+      ...(parsed.sessionId ? { sessionId: String(parsed.sessionId).slice(0, SESSION_ID_MAX_LEN) } : {}),
+      ...(parsed.tool ? { tool: String(parsed.tool).slice(0, TOOL_MAX_LEN) } : {}),
     });
   }
 
