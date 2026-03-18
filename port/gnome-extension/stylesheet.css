@@ -1,0 +1,31 @@
+/* Battery GNOME Extension Stylesheet */
+
+.battery-indicator {
+  spacing: 4px;
+}
+
+.battery-label {
+  font-size: 0.9em;
+}
+
+.battery-popup-row {
+  padding: 4px 8px;
+}
+
+.battery-popup-key {
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 100px;
+}
+
+.battery-popup-value {
+  font-weight: bold;
+}
+
+.battery-stale-notice {
+  color: #f9a825;
+  font-style: italic;
+}
+
+.battery-error-notice {
+  color: #ef5350;
+}

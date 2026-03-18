@@ -1,0 +1,6 @@
+{
+  "uuid": "battery@allthingsclaude.local",
+  "name": "Battery",
+  "description": "Claude usage indicator for GNOME Shell",
+  "shell-version": ["46", "47", "48"]
+}
