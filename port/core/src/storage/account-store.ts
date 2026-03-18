@@ -1,4 +1,5 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 
 interface PortableStoredAccount {
@@ -118,6 +119,12 @@ export interface StoredAccountRecord {
   createdAt: string;
 }
 
+function isStoredAccountRecord(v: unknown): v is StoredAccountRecord {
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return typeof r['id'] === 'string' && typeof r['name'] === 'string';
+}
+
 export async function readAllAccounts(homeDir: string): Promise<StoredAccountRecord[]> {
   const accountsPath = join(homeDir, '.battery', 'accounts.json');
   let raw: string;
@@ -128,7 +135,9 @@ export async function readAllAccounts(homeDir: string): Promise<StoredAccountRec
   }
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as StoredAccountRecord[]) : [];
+    // Filter rather than cast: old PortableStoredAccount format (selected:boolean)
+    // must not be treated as StoredAccountRecord and silently corrupt re-auth logic.
+    return Array.isArray(parsed) ? (parsed as unknown[]).filter(isStoredAccountRecord) : [];
   } catch {
     return [];
   }
@@ -137,11 +146,17 @@ export async function readAllAccounts(homeDir: string): Promise<StoredAccountRec
 export async function writeAccounts(homeDir: string, accounts: StoredAccountRecord[]): Promise<void> {
   const batteryDir = join(homeDir, '.battery');
   await mkdir(batteryDir, { recursive: true });
-  await writeFile(join(batteryDir, 'accounts.json'), JSON.stringify(accounts, null, 2), 'utf8');
+  const dest = join(batteryDir, 'accounts.json');
+  const tmp = join(batteryDir, `.accounts.${randomBytes(4).toString('hex')}.tmp`);
+  await writeFile(tmp, JSON.stringify(accounts, null, 2), 'utf8');
+  await rename(tmp, dest);
 }
 
 export async function writeSelectedAccountId(homeDir: string, accountId: string): Promise<void> {
   const batteryDir = join(homeDir, '.battery');
   await mkdir(batteryDir, { recursive: true });
-  await writeFile(join(batteryDir, 'selected-account-id'), accountId, 'utf8');
+  const dest = join(batteryDir, 'selected-account-id');
+  const tmp = join(batteryDir, `.selected-account-id.${randomBytes(4).toString('hex')}.tmp`);
+  await writeFile(tmp, accountId, 'utf8');
+  await rename(tmp, dest);
 }

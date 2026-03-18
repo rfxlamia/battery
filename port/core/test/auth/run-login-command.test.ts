@@ -5,6 +5,19 @@ import { join } from 'node:path';
 import { runLoginCommand } from '../../src/auth/run-login-command.js';
 
 describe('runLoginCommand', () => {
+  it('propagates browser launch errors', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'battery-login-fail-'));
+    await expect(
+      runLoginCommand({
+        homeDir,
+        fetchImpl: async () => new Response('{}', { status: 200 }) as never,
+        startOAuthLoginImpl: async () => {
+          throw new Error('Failed to open browser: xdg-open: not found');
+        },
+      }),
+    ).rejects.toThrow(/failed to open browser/i);
+  });
+
   it('persists login output and writes an ok state immediately', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'battery-login-command-'));
 

@@ -65,7 +65,9 @@ export async function startOAuthLogin(opts: StartOAuthLoginOptions): Promise<Tok
   const { verifier, challenge } = createPkcePair();
   const state = generateState();
 
-  const listener = await startOAuthListener({ path: '/callback' });
+  // Pass expectedState so the listener rejects any callback that doesn't
+  // carry the matching state parameter (RFC 6749 §10.12 CSRF protection).
+  const listener = await startOAuthListener({ path: '/callback', expectedState: state });
   const redirectUri = `http://localhost:${listener.port}/callback`;
 
   const authorizeUrl = buildAuthorizeUrl({ redirectUri, state, codeChallenge: challenge });

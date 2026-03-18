@@ -80,10 +80,15 @@ const BatteryIndicator = GObject.registerClass(class BatteryIndicator extends Pa
     _buildPopupContent(this.menu, state);
     if (state?.status === 'login_required') {
       this.menu.addAction('Sign in', () => {
-        const cmd = getBatteryCoreLoginCommand(GLib.get_home_dir());
-        const proc = Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE);
-        proc.init(null);
-        this._refresh();
+        try {
+          const cmd = getBatteryCoreLoginCommand(GLib.get_home_dir());
+          const proc = Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE);
+          proc.init(null);
+          // Login is async — the 30-second poll timer will pick up ok state
+          // when the browser OAuth flow completes.
+        } catch (err) {
+          console.error('Battery: failed to launch login command:', err);
+        }
       });
     }
     this.menu.addAction('Reload state', () => this._refresh());
