@@ -1,0 +1,14 @@
+[Unit]
+Description=Battery Core — Anthropic usage monitor background service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/battery/node_modules/.bin/battery-core
+Restart=on-failure
+RestartSec=10
+Environment=HOME=%h
+
+[Install]
+WantedBy=default.target
