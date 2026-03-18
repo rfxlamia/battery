@@ -40,6 +40,14 @@ describe('getIndicatorLabel', () => {
     ).toBe('Battery Stale');
   });
 
+  it('renders stale when the local state file is missing', () => {
+    expect(getIndicatorLabel({ _localStateStatus: 'missing' })).toBe('Battery Stale');
+  });
+
+  it('renders error when the local state file is invalid', () => {
+    expect(getIndicatorLabel({ _localStateStatus: 'invalid' })).toBe('Battery Error');
+  });
+
   it('renders reset time in label', () => {
     const label = getIndicatorLabel(
       {
@@ -78,5 +86,9 @@ describe('getDisplayState', () => {
         new Date('2026-03-17T00:00:00.000Z'),
       ),
     ).toMatchObject({ kind: 'ok' });
+  });
+
+  it('returns stale kind for missing local state', () => {
+    expect(getDisplayState({ _localStateStatus: 'missing' })).toMatchObject({ kind: 'stale' });
   });
 });

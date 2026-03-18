@@ -26,16 +26,20 @@ describe('formatResetTime', () => {
 });
 
 describe('formatDuration', () => {
-  it('formats zero minutes as 0m', () => {
-    expect(formatDuration(0)).toBe('0m');
+  it('formats zero seconds as 0s', () => {
+    expect(formatDuration(0)).toBe('0s');
   });
 
   it('formats 90 minutes as 1h 30m', () => {
-    expect(formatDuration(90)).toBe('1h 30m');
+    expect(formatDuration(90 * 60)).toBe('1h 30m');
   });
 
   it('formats 59 minutes as 59m', () => {
-    expect(formatDuration(59)).toBe('59m');
+    expect(formatDuration(59 * 60)).toBe('59m');
+  });
+
+  it('formats sub-minute durations as seconds', () => {
+    expect(formatDuration(30)).toBe('30s');
   });
 });
 
@@ -46,10 +50,10 @@ describe('formatUpdatedAt', () => {
     ).toBe('just now');
   });
 
-  it('returns seconds ago for recent update', () => {
+  it('returns "just now" for updates under one minute', () => {
     expect(
       formatUpdatedAt('2026-03-17T00:00:00.000Z', new Date('2026-03-17T00:00:30.000Z')),
-    ).toBe('30s ago');
+    ).toBe('just now');
   });
 
   it('returns minutes ago', () => {
@@ -62,6 +66,12 @@ describe('formatUpdatedAt', () => {
     expect(
       formatUpdatedAt('2026-03-17T00:00:00.000Z', new Date('2026-03-17T02:00:00.000Z')),
     ).toBe('2h ago');
+  });
+
+  it('returns days ago after 24 hours', () => {
+    expect(
+      formatUpdatedAt('2026-03-17T00:00:00.000Z', new Date('2026-03-19T00:00:00.000Z')),
+    ).toBe('2d ago');
   });
 
   it('returns "unknown" for null input', () => {

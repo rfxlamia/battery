@@ -40,7 +40,7 @@ describe('buildPopupRows', () => {
   it('returns error message for error state', () => {
     const rows = buildPopupRows({
       status: 'error',
-      error: { code: 'rate_limited', message: 'Too many requests' },
+      error: { kind: 'rate_limited', message: 'Too many requests' },
       freshness: { staleAfterSeconds: 300 },
     });
     expect(rows.some((r) => r.message?.toLowerCase().includes('error'))).toBe(true);
@@ -62,5 +62,18 @@ describe('buildPopupRows', () => {
     const rows = buildPopupRows(null);
     expect(Array.isArray(rows)).toBe(true);
     expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it('returns stale notice for missing local state', () => {
+    const rows = buildPopupRows({ _localStateStatus: 'missing' });
+    expect(rows.some((r) => r.stale === true)).toBe(true);
+  });
+
+  it('maps raw plan tiers to Swift-style display names', () => {
+    const rows = buildPopupRows({
+      ...okState,
+      account: { ...okState.account, planTier: 'max_5x' },
+    });
+    expect(rows.some((r) => r.value === 'Max 5x')).toBe(true);
   });
 });

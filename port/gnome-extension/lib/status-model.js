@@ -12,6 +12,8 @@ import { formatResetTime } from './time-format.js';
  * @returns {string}
  */
 export function getIndicatorLabel(state, now = new Date()) {
+  if (state?._localStateStatus === 'missing') return 'Battery Stale';
+  if (state?._localStateStatus === 'invalid') return 'Battery Error';
   if (!state || typeof state !== 'object') return 'Battery';
 
   const { status, session, freshness, updatedAt } = state;
@@ -55,6 +57,8 @@ export function isStale(updatedAt, freshness, now) {
  * @returns {{ kind: 'login_required'|'loading'|'error'|'stale'|'ok'|'unknown' }}
  */
 export function getDisplayState(state, now = new Date()) {
+  if (state?._localStateStatus === 'missing') return { kind: 'stale' };
+  if (state?._localStateStatus === 'invalid') return { kind: 'error' };
   if (!state || typeof state !== 'object') return { kind: 'unknown' };
   const { status, freshness, updatedAt } = state;
   if (status === 'login_required') return { kind: 'login_required' };

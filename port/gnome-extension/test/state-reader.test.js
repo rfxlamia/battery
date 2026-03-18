@@ -43,6 +43,7 @@ describe('parseStateJson', () => {
   it('returns state for login_required (no session or account required)', () => {
     const raw = JSON.stringify({
       version: 1,
+      updatedAt: '2026-03-17T00:00:00.000Z',
       status: 'login_required',
       freshness: { staleAfterSeconds: 300 },
     });
@@ -53,6 +54,7 @@ describe('parseStateJson', () => {
   it('returns state for loading status', () => {
     const raw = JSON.stringify({
       version: 1,
+      updatedAt: '2026-03-17T00:00:00.000Z',
       status: 'loading',
       freshness: { staleAfterSeconds: 300 },
     });
@@ -62,9 +64,10 @@ describe('parseStateJson', () => {
   it('returns state for error status with error field present', () => {
     const raw = JSON.stringify({
       version: 1,
+      updatedAt: '2026-03-17T00:00:00.000Z',
       status: 'error',
       freshness: { staleAfterSeconds: 300 },
-      error: { code: 'rate_limited', message: 'Too many requests' },
+      error: { kind: 'rate_limited', message: 'Too many requests' },
     });
     expect(parseStateJson(raw)).toMatchObject({ status: 'error' });
   });
@@ -72,7 +75,19 @@ describe('parseStateJson', () => {
   it('returns null for error status without error field', () => {
     const raw = JSON.stringify({
       version: 1,
+      updatedAt: '2026-03-17T00:00:00.000Z',
       status: 'error',
+      freshness: { staleAfterSeconds: 300 },
+    });
+    expect(parseStateJson(raw)).toBeNull();
+  });
+
+  it('returns null when account shape is invalid', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      status: 'ok',
+      updatedAt: '2026-03-17T00:00:00.000Z',
+      account: { id: 'a1', name: 'Alice', planTier: 'pro', isSelected: false },
       freshness: { staleAfterSeconds: 300 },
     });
     expect(parseStateJson(raw)).toBeNull();

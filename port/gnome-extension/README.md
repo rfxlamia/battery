@@ -19,6 +19,10 @@ Heavy logic lives in the Battery core TypeScript service. The extension reads sh
 ## Install
 
 ```bash
+cd port/core
+npm install
+./install-local.sh
+
 cd port/gnome-extension
 npm install        # install dev dependencies (for tests only)
 ./install-local.sh

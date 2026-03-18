@@ -13,22 +13,28 @@ export function formatResetTime(resetsAt, now) {
   if (!resetsAt) return null;
   const reset = new Date(resetsAt);
   if (isNaN(reset.getTime())) return null;
-  const diffMs = reset.getTime() - now.getTime();
-  if (diffMs <= 0) return null;
-  return formatDuration(Math.floor(diffMs / 60000));
+  const diffSeconds = Math.floor((reset.getTime() - now.getTime()) / 1000);
+  if (diffSeconds <= 0) return null;
+  return formatDuration(diffSeconds);
 }
 
 /**
- * Formats a duration in minutes as a human-readable string.
+ * Formats a duration in seconds using the Swift shortDuration rules.
  *
- * @param {number} totalMinutes
+ * @param {number} totalSeconds
  * @returns {string}
  */
-export function formatDuration(totalMinutes) {
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+export function formatDuration(totalSeconds) {
+  if (totalSeconds <= 0) return '0s';
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
   if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  if (seconds > 0) return `${seconds}s`;
+  return '< 1m';
 }
 
 /**
@@ -43,10 +49,11 @@ export function formatUpdatedAt(updatedAt, now) {
   const updated = new Date(updatedAt);
   if (isNaN(updated.getTime())) return 'unknown';
   const diffSeconds = Math.floor((now.getTime() - updated.getTime()) / 1000);
-  if (diffSeconds < 10) return 'just now';
-  if (diffSeconds < 60) return `${diffSeconds}s ago`;
+  if (diffSeconds < 60) return 'just now';
   const diffMinutes = Math.floor(diffSeconds / 60);
   if (diffMinutes < 60) return `${diffMinutes}m ago`;
   const diffHours = Math.floor(diffMinutes / 60);
-  return `${diffHours}h ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
 }

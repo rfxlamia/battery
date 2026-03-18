@@ -7,6 +7,13 @@
 import { isStale } from './status-model.js';
 import { formatResetTime, formatUpdatedAt } from './time-format.js';
 
+const PLAN_TIER_DISPLAY = {
+  pro: 'Pro',
+  max: 'Max',
+  max_5x: 'Max 5x',
+  unknown: 'Unknown',
+};
+
 /**
  * Row types:
  *   { label: string, value: string }              — key/value data row
@@ -22,6 +29,14 @@ import { formatResetTime, formatUpdatedAt } from './time-format.js';
  * @returns {Array<{label?: string, value?: string, message?: string, stale?: boolean, error?: boolean, loginRequired?: boolean}>}
  */
 export function buildPopupRows(state, now = new Date()) {
+  if (state?._localStateStatus === 'missing') {
+    return [{ message: 'Data is stale — core service may not be running', stale: true }];
+  }
+
+  if (state?._localStateStatus === 'invalid') {
+    return [{ message: 'Error: Battery state file is invalid', error: true }];
+  }
+
   if (!state || typeof state !== 'object') {
     return [{ message: 'Battery: no data available' }];
   }
@@ -51,7 +66,10 @@ export function buildPopupRows(state, now = new Date()) {
 
     if (state.account) {
       rows.push({ label: 'Account', value: state.account.name });
-      rows.push({ label: 'Plan', value: state.account.planTier });
+      rows.push({
+        label: 'Plan',
+        value: PLAN_TIER_DISPLAY[state.account.planTier] ?? state.account.planTier,
+      });
     }
 
     if (state.session) {

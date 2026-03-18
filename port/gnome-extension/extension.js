@@ -60,11 +60,11 @@ class BatteryIndicator extends PanelMenu.Button {
     try {
       const file = Gio.File.new_for_path(this._stateFile);
       const [ok, contents] = file.load_contents(null);
-      if (!ok) return null;
+      if (!ok) return { _localStateStatus: 'missing' };
       const rawJson = new TextDecoder().decode(contents);
-      return parseStateJson(rawJson);
+      return parseStateJson(rawJson) ?? { _localStateStatus: 'invalid' };
     } catch {
-      return null;
+      return { _localStateStatus: 'missing' };
     }
   }
 
@@ -73,7 +73,7 @@ class BatteryIndicator extends PanelMenu.Button {
     this._label.set_text(getIndicatorLabel(state));
     this.menu.removeAll();
     _buildPopupContent(this.menu, state);
-    this.menu.addAction('Refresh', () => this._refresh());
+    this.menu.addAction('Reload state', () => this._refresh());
   }
 
   destroy() {
