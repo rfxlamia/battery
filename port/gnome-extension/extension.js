@@ -7,6 +7,7 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -32,7 +33,7 @@ export default class BatteryExtension extends Extension {
   }
 }
 
-class BatteryIndicator extends PanelMenu.Button {
+const BatteryIndicator = GObject.registerClass(class BatteryIndicator extends PanelMenu.Button {
   _init(extension) {
     super._init(0.0, 'Battery');
 
@@ -86,7 +87,7 @@ class BatteryIndicator extends PanelMenu.Button {
     }
     super.destroy();
   }
-}
+});
 
 /**
  * Populate a PanelMenu.Menu with styled items derived from state rows.
