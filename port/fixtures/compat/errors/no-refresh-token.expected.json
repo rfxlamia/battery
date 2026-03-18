@@ -1,0 +1,4 @@
+{
+  "_note": "When no refresh token is available and a 401 occurs, the system emits login_required.",
+  "status": "login_required"
+}

@@ -1,0 +1,4 @@
+{
+  "_note": "After a 401, pollOnce force-refreshes tokens and retries. If the retry succeeds, the result is an ok state.",
+  "status": "ok"
+}
