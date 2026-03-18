@@ -16,11 +16,24 @@ export async function readTokens(homeDir: string, accountId: string): Promise<St
     return null;
   }
 
+  let parsed: unknown;
   try {
-    return JSON.parse(raw) as StoredTokens;
+    parsed = JSON.parse(raw);
   } catch {
     return null;
   }
+  if (!isStoredTokens(parsed)) return null;
+  return parsed;
+}
+
+function isStoredTokens(v: unknown): v is StoredTokens {
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r['accessToken'] === 'string' &&
+    typeof r['expiresAt'] === 'string' &&
+    (r['refreshToken'] === undefined || typeof r['refreshToken'] === 'string')
+  );
 }
 
 export async function writeTokens(
@@ -29,7 +42,7 @@ export async function writeTokens(
   tokens: StoredTokens,
 ): Promise<void> {
   const tokensDir = join(homeDir, '.battery', 'tokens');
-  await mkdir(tokensDir, { recursive: true });
+  await mkdir(tokensDir, { recursive: true, mode: 0o700 });
   const tokenPath = join(tokensDir, `${accountId}.json`);
   await writeFile(tokenPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
 }

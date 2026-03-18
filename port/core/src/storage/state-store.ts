@@ -5,7 +5,7 @@ import type { BatteryState } from '../contracts/index.js';
 
 export async function writeStateFile(homeDir: string, state: BatteryState): Promise<void> {
   const batteryDir = join(homeDir, '.battery');
-  await mkdir(batteryDir, { recursive: true });
+  await mkdir(batteryDir, { recursive: true, mode: 0o700 });
 
   const statePath = join(batteryDir, 'state.json');
   const tempPath = join(batteryDir, `.state.${randomBytes(4).toString('hex')}.tmp`);

@@ -8,6 +8,17 @@ interface StoredAccount {
   selected: boolean;
 }
 
+function isStoredAccount(v: unknown): v is StoredAccount {
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r['id'] === 'string' &&
+    typeof r['name'] === 'string' &&
+    typeof r['planTier'] === 'string' &&
+    typeof r['selected'] === 'boolean'
+  );
+}
+
 export interface SelectedAccount {
   id: string;
   name: string;
@@ -32,8 +43,8 @@ export async function readSelectedAccount(homeDir: string): Promise<SelectedAcco
 
   if (!Array.isArray(accounts)) return null;
 
-  const selected = (accounts as StoredAccount[]).find((a) => a.selected === true);
-  if (!selected) return null;
+  const selected = (accounts as unknown[]).find(isStoredAccount);
+  if (!selected || !selected.selected) return null;
 
   return { id: selected.id, name: selected.name, planTier: selected.planTier };
 }

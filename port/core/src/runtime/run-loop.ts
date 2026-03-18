@@ -25,7 +25,9 @@ export async function runLoopTick(deps: TickDeps): Promise<TickResult> {
 }
 
 /**
- * Returns the shell command used to launch the core (for use in systemd unit).
+ * Returns the node command to launch the core from its compiled location.
+ * Reflects the development/compiled source path — not the installed systemd
+ * path (%h/.local/share/battery/...). Useful for dev tooling and diagnostics.
  */
 export function getServiceCommand(): string {
   const mainPath = fileURLToPath(new URL('../main.js', import.meta.url));
