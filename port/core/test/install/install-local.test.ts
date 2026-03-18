@@ -76,15 +76,19 @@ describe('local installer paths', () => {
     const unitPath = join(fakeHome, '.config', 'systemd', 'user', 'battery-core.service');
     const launcher = await readFile(launcherPath, 'utf8');
     const unit = await readFile(unitPath, 'utf8');
-    const npmLog = await readFile(npmLogPath, 'utf8');
-    const systemctlLog = await readFile(systemctlLogPath, 'utf8');
+    const npmLog = (await readFile(npmLogPath, 'utf8')).trim().split('\n');
+    const systemctlLog = (await readFile(systemctlLogPath, 'utf8')).trim().split('\n');
 
     expect(launcher).toContain('dist/main.js');
     expect(unit).toContain('ExecStart=%h/.local/share/battery/core/run-battery-core.sh');
-    expect(npmLog).toContain('ci');
-    expect(npmLog).toContain('run build');
-    expect(npmLog).toContain('ci --omit=dev --prefix');
-    expect(systemctlLog).toContain('--user daemon-reload');
-    expect(systemctlLog).toContain('--user enable --now battery-core.service');
+    expect(npmLog).toEqual([
+      'ci',
+      'run build',
+      `ci --omit=dev --prefix ${join(fakeHome, '.local', 'share', 'battery', 'core')}`,
+    ]);
+    expect(systemctlLog).toEqual([
+      '--user daemon-reload',
+      '--user enable --now battery-core.service',
+    ]);
   });
 });
