@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 interface PortableStoredAccount {
@@ -96,7 +96,7 @@ export async function readSelectedAccount(homeDir: string): Promise<SelectedAcco
   return { id: selected.id, name: selected.name, planTier: selected.planTier };
 }
 
-async function readPersistedSelectedAccountId(homeDir: string): Promise<string | null> {
+export async function readPersistedSelectedAccountId(homeDir: string): Promise<string | null> {
   const selectedAccountPath = join(homeDir, '.battery', 'selected-account-id');
   let raw: string;
   try {
@@ -107,4 +107,41 @@ async function readPersistedSelectedAccountId(homeDir: string): Promise<string |
 
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+export interface StoredAccountRecord {
+  id: string;
+  name: string;
+  email: null;
+  planTier: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export async function readAllAccounts(homeDir: string): Promise<StoredAccountRecord[]> {
+  const accountsPath = join(homeDir, '.battery', 'accounts.json');
+  let raw: string;
+  try {
+    raw = await readFile(accountsPath, 'utf8');
+  } catch {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as StoredAccountRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function writeAccounts(homeDir: string, accounts: StoredAccountRecord[]): Promise<void> {
+  const batteryDir = join(homeDir, '.battery');
+  await mkdir(batteryDir, { recursive: true });
+  await writeFile(join(batteryDir, 'accounts.json'), JSON.stringify(accounts, null, 2), 'utf8');
+}
+
+export async function writeSelectedAccountId(homeDir: string, accountId: string): Promise<void> {
+  const batteryDir = join(homeDir, '.battery');
+  await mkdir(batteryDir, { recursive: true });
+  await writeFile(join(batteryDir, 'selected-account-id'), accountId, 'utf8');
 }
