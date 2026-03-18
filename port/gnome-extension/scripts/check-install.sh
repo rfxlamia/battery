@@ -24,7 +24,14 @@ if ! gnome-extensions info "$EXTENSION_UUID" > /dev/null 2>&1; then
   exit 1
 fi
 
-echo "  ✓ Extension files installed"
+# Check extension is enabled (info exits 0 even when disabled)
+if ! gnome-extensions list --enabled | grep -q "^$EXTENSION_UUID$"; then
+  echo "FAIL: Extension $EXTENSION_UUID is installed but not enabled."
+  echo "      Run: gnome-extensions enable $EXTENSION_UUID"
+  exit 1
+fi
+
+echo "  ✓ Extension installed and enabled"
 
 # Check core service is running
 if ! systemctl --user --quiet is-active battery-core.service; then

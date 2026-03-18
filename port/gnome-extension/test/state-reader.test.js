@@ -49,4 +49,32 @@ describe('parseStateJson', () => {
     const result = parseStateJson(raw);
     expect(result).toMatchObject({ status: 'login_required' });
   });
+
+  it('returns state for loading status', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      status: 'loading',
+      freshness: { staleAfterSeconds: 300 },
+    });
+    expect(parseStateJson(raw)).toMatchObject({ status: 'loading' });
+  });
+
+  it('returns state for error status with error field present', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      status: 'error',
+      freshness: { staleAfterSeconds: 300 },
+      error: { code: 'rate_limited', message: 'Too many requests' },
+    });
+    expect(parseStateJson(raw)).toMatchObject({ status: 'error' });
+  });
+
+  it('returns null for error status without error field', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      status: 'error',
+      freshness: { staleAfterSeconds: 300 },
+    });
+    expect(parseStateJson(raw)).toBeNull();
+  });
 });

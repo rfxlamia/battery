@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatResetTime, formatDuration } from '../lib/time-format.js';
+import { formatResetTime, formatDuration, formatUpdatedAt } from '../lib/time-format.js';
 
 describe('formatResetTime', () => {
   it('returns null when resetsAt is null', () => {
@@ -36,5 +36,39 @@ describe('formatDuration', () => {
 
   it('formats 59 minutes as 59m', () => {
     expect(formatDuration(59)).toBe('59m');
+  });
+});
+
+describe('formatUpdatedAt', () => {
+  it('returns "just now" for very recent update', () => {
+    expect(
+      formatUpdatedAt('2026-03-17T00:00:00.000Z', new Date('2026-03-17T00:00:05.000Z')),
+    ).toBe('just now');
+  });
+
+  it('returns seconds ago for recent update', () => {
+    expect(
+      formatUpdatedAt('2026-03-17T00:00:00.000Z', new Date('2026-03-17T00:00:30.000Z')),
+    ).toBe('30s ago');
+  });
+
+  it('returns minutes ago', () => {
+    expect(
+      formatUpdatedAt('2026-03-17T00:00:00.000Z', new Date('2026-03-17T00:05:00.000Z')),
+    ).toBe('5m ago');
+  });
+
+  it('returns hours ago', () => {
+    expect(
+      formatUpdatedAt('2026-03-17T00:00:00.000Z', new Date('2026-03-17T02:00:00.000Z')),
+    ).toBe('2h ago');
+  });
+
+  it('returns "unknown" for null input', () => {
+    expect(formatUpdatedAt(null, new Date())).toBe('unknown');
+  });
+
+  it('returns "unknown" for invalid date string', () => {
+    expect(formatUpdatedAt('not-a-date', new Date())).toBe('unknown');
   });
 });

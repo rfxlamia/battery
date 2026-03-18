@@ -2,15 +2,16 @@
  * Popup view helpers — pure module, no GNOME Shell dependencies.
  *
  * buildPopupRows() computes the data model for the popup.
- * buildPopupContent() binds that model to GJS menu items (GJS only).
+ * The GJS-side buildPopupContent() lives in extension.js where GJS APIs are available.
  */
 import { isStale } from './status-model.js';
 import { formatResetTime, formatUpdatedAt } from './time-format.js';
 
 /**
  * Row types:
- *   { label: string, value: string }   — key/value data row
- *   { message: string, stale?: bool }  — status message row
+ *   { label: string, value: string }              — key/value data row
+ *   { message: string, stale?: true, error?: true, loginRequired?: true }
+ *                                                  — status message row
  */
 
 /**
@@ -18,7 +19,7 @@ import { formatResetTime, formatUpdatedAt } from './time-format.js';
  *
  * @param {object|null} state
  * @param {Date} [now]
- * @returns {Array<{label?: string, value?: string, message?: string, stale?: boolean}>}
+ * @returns {Array<{label?: string, value?: string, message?: string, stale?: boolean, error?: boolean, loginRequired?: boolean}>}
  */
 export function buildPopupRows(state, now = new Date()) {
   if (!state || typeof state !== 'object') {
@@ -28,7 +29,7 @@ export function buildPopupRows(state, now = new Date()) {
   const { status } = state;
 
   if (status === 'login_required') {
-    return [{ message: 'Sign in to Claude to see usage' }];
+    return [{ message: 'Sign in to Claude to see usage', loginRequired: true }];
   }
 
   if (status === 'loading') {
@@ -37,7 +38,7 @@ export function buildPopupRows(state, now = new Date()) {
 
   if (status === 'error') {
     const msg = state.error?.message ?? 'An error occurred';
-    return [{ message: `Error: ${msg}` }];
+    return [{ message: `Error: ${msg}`, error: true }];
   }
 
   if (status === 'ok') {
@@ -79,24 +80,4 @@ export function buildPopupRows(state, now = new Date()) {
   }
 
   return [{ message: 'Battery: unknown state' }];
-}
-
-/**
- * Populate a PanelMenu.Menu with items derived from state.
- * GJS only — not importable in Node (Clutter/St not available).
- *
- * @param {object} menu - PanelMenu.Menu instance
- * @param {object|null} state
- * @param {Date} [now]
- */
-export function buildPopupContent(menu, state, now = new Date()) {
-  const rows = buildPopupRows(state, now);
-
-  for (const row of rows) {
-    if (row.message != null) {
-      menu.addAction(row.message, () => {});
-    } else if (row.label != null) {
-      menu.addAction(`${row.label}: ${row.value}`, () => {});
-    }
-  }
 }

@@ -96,3 +96,7 @@ npm test
 ```
 
 Tests cover `lib/status-model.js`, `lib/time-format.js`, `lib/state-reader.js`, and `lib/popup-view.js`.
+
+### Mock state file
+
+`dev/mock-state.json` has a fixed `updatedAt` timestamp. If it is older than `freshness.staleAfterSeconds` (360s) relative to the current time, the extension will show `Battery Stale` rather than the intended `42% · 1h 18m`. Update the timestamp to the current time when testing the mock state path live in GNOME.

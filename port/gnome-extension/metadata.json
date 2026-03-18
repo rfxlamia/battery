@@ -2,5 +2,6 @@
   "uuid": "battery@allthingsclaude.local",
   "name": "Battery",
   "description": "Claude usage indicator for GNOME Shell",
+  "version": 1,
   "shell-version": ["46", "47", "48"]
 }
