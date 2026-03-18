@@ -32,6 +32,11 @@ describe('buildPopupRows', () => {
     expect(rows.some((r) => r.value?.includes('31%'))).toBe(true);
   });
 
+  it('includes login-needed messaging', () => {
+    const rows = buildPopupRows({ status: 'login_required', freshness: { staleAfterSeconds: 300 } });
+    expect(rows.some((row) => row.loginRequired === true)).toBe(true);
+  });
+
   it('returns login_required message for login_required state', () => {
     const rows = buildPopupRows({ status: 'login_required', freshness: { staleAfterSeconds: 300 } });
     expect(rows.some((r) => r.message?.toLowerCase().includes('sign in'))).toBe(true);

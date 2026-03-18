@@ -18,6 +18,7 @@ import { getIndicatorLabel } from './lib/status-model.js';
 import { parseStateJson } from './lib/state-reader.js';
 import { buildPopupRows } from './lib/popup-view.js';
 import { getLocalStateStatusForReadFailure } from './lib/read-error-status.js';
+import { getBatteryCoreLoginCommand } from './lib/core-launcher.js';
 
 const REFRESH_INTERVAL_SECONDS = 30;
 
@@ -77,6 +78,14 @@ const BatteryIndicator = GObject.registerClass(class BatteryIndicator extends Pa
     this._label.set_text(getIndicatorLabel(state));
     this.menu.removeAll();
     _buildPopupContent(this.menu, state);
+    if (state?.status === 'login_required') {
+      this.menu.addAction('Sign in', () => {
+        const cmd = getBatteryCoreLoginCommand(GLib.get_home_dir());
+        const proc = Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE);
+        proc.init(null);
+        this._refresh();
+      });
+    }
     this.menu.addAction('Reload state', () => this._refresh());
   }
 

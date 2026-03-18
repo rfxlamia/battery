@@ -18,6 +18,8 @@ Heavy logic lives in the Battery core TypeScript service. The extension reads sh
 
 ## Install
 
+Install the core first, then the extension:
+
 ```bash
 cd port/core
 npm install
@@ -45,9 +47,22 @@ gnome-extensions enable battery@allthingsclaude.local
 - **X11:** Press `Alt+F2`, type `r`, press `Enter`
 - **Wayland:** Log out and log back in
 
+## Sign in
+
+If the top bar shows **Battery Sign in**, click the indicator and select **Sign in**. This launches browser-based OAuth:
+
+```bash
+# Or run manually:
+~/.local/share/battery/core/battery-core.sh login
+```
+
+After completing OAuth in the browser, the extension will update to show usage on the next poll interval.
+
+> **Wayland note:** First discovery of a newly installed extension may still require logout/login before the extension becomes active.
+
 ## What you should see
 
-After enabling the extension, **Battery** should appear in the GNOME top bar showing your current session utilization (e.g. `42% · 1h 18m`).
+After signing in, **Battery** should appear in the GNOME top bar showing your current session utilization (e.g. `42% · 1h 18m`).
 
 | State | Label |
 |-------|-------|
