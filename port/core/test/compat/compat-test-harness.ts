@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { HookEvent } from '../../src/hooks/session-reducer.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FIXTURES_ROOT = join(__dirname, '..', '..', '..', '..', 'fixtures');
+const FIXTURES_ROOT = join(__dirname, '..', '..', '..', 'fixtures');
 
 /**
  * Load a JSONL hook-event fixture file, filtering out documentation-only lines

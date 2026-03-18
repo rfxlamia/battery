@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "status": "ok",
+  "account": {
+    "id": "acct-1",
+    "name": "Alice",
+    "planTier": "pro",
+    "isSelected": true
+  },
+  "freshness": {
+    "staleAfterSeconds": 300
+  }
+}

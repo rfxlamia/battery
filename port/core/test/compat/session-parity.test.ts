@@ -1,25 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { loadHookFixture } from './compat-test-harness.js';
-import { reduceSessionState } from '../../src/hooks/session-reducer.js';
+import { loadHookFixture, loadExpected } from './compat-test-harness.js';
+import { reduceSessionState, type SessionState } from '../../src/hooks/session-reducer.js';
 
 describe('session parity', () => {
   it('matches the expected active-session result from the Swift fixture (start-stop)', async () => {
     const fixture = await loadHookFixture('session-start-stop.jsonl');
+    const expected = await loadExpected<SessionState>('session/start-stop.expected.json');
     // SessionEnd timestamp (08:10) >= SessionStart timestamp (08:00), so session is inactive.
     // now = 1h after last event, well past any timeout.
     const state = reduceSessionState(fixture.events, fixture.now);
 
-    expect(state.isActive).toBe(false);
-    expect(state.currentSessionId).toBeNull();
+    expect(state).toMatchObject(expected);
   });
 
   it('detects idle timeout from the Swift fixture (idle-timeout)', async () => {
     const fixture = await loadHookFixture('idle-timeout.jsonl');
+    const expected = await loadExpected<SessionState>('session/idle-timeout.expected.json');
     // Last activity at 09:03:00, now = 1h later → well beyond 300s idle timeout
     const state = reduceSessionState(fixture.events, fixture.now);
 
-    expect(state.isActive).toBe(false);
-    expect(state.currentSessionId).toBeNull();
+    expect(state).toMatchObject(expected);
   });
 
   it('treats stop event identically to PostToolUse', async () => {
