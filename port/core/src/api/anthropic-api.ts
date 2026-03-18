@@ -1,5 +1,9 @@
 import { makeApiError, type ApiError } from './api-errors.js';
-import { ANTHROPIC_API_BASE_URL } from '../config/env.js';
+import {
+  ANTHROPIC_API_BASE_URL,
+  ANTHROPIC_BETA_HEADER,
+  BATTERY_USER_AGENT,
+} from '../config/env.js';
 
 const USAGE_TIMEOUT_MS = 15_000;
 
@@ -33,10 +37,11 @@ export async function fetchUsage(
 
   let response: Response;
   try {
-    response = await fetchImpl(`${baseUrl}/v1/usage`, {
+    response = await fetchImpl(`${baseUrl}/api/oauth/usage`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'anthropic-version': '2023-06-01',
+        'anthropic-beta': ANTHROPIC_BETA_HEADER,
+        'User-Agent': BATTERY_USER_AGENT,
       },
       signal: controller.signal,
     });

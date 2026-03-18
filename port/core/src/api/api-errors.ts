@@ -9,6 +9,7 @@ export interface TokenError {
   kind: 'no_refresh_token' | 'refresh_failed' | 'network_error';
   message: string;
   statusCode?: number;
+  body?: string;
 }
 
 export function makeApiError(

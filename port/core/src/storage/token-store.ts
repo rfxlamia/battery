@@ -1,10 +1,17 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, chmod, rename } from 'node:fs/promises';
 import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 
 export interface StoredTokens {
   accessToken: string;
   refreshToken?: string;
   expiresAt: string;
+}
+
+interface DiskStoredTokens {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt: string | number;
 }
 
 export async function readTokens(homeDir: string, accountId: string): Promise<StoredTokens | null> {
@@ -22,18 +29,30 @@ export async function readTokens(homeDir: string, accountId: string): Promise<St
   } catch {
     return null;
   }
-  if (!isStoredTokens(parsed)) return null;
-  return parsed;
+  if (!isDiskStoredTokens(parsed)) return null;
+  return normalizeStoredTokens(parsed);
 }
 
-function isStoredTokens(v: unknown): v is StoredTokens {
+function isDiskStoredTokens(v: unknown): v is DiskStoredTokens {
   if (typeof v !== 'object' || v === null) return false;
   const r = v as Record<string, unknown>;
   return (
     typeof r['accessToken'] === 'string' &&
-    typeof r['expiresAt'] === 'string' &&
+    (typeof r['expiresAt'] === 'string' || typeof r['expiresAt'] === 'number') &&
     (r['refreshToken'] === undefined || typeof r['refreshToken'] === 'string')
   );
+}
+
+function normalizeStoredTokens(tokens: DiskStoredTokens): StoredTokens | null {
+  const expiresAtValue = typeof tokens.expiresAt === 'number'
+    ? tokens.expiresAt
+    : new Date(tokens.expiresAt).getTime();
+  if (Number.isNaN(expiresAtValue)) return null;
+  return {
+    accessToken: tokens.accessToken,
+    ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
+    expiresAt: new Date(expiresAtValue).toISOString(),
+  };
 }
 
 export async function writeTokens(
@@ -43,6 +62,18 @@ export async function writeTokens(
 ): Promise<void> {
   const tokensDir = join(homeDir, '.battery', 'tokens');
   await mkdir(tokensDir, { recursive: true, mode: 0o700 });
+  await chmod(tokensDir, 0o700);
   const tokenPath = join(tokensDir, `${accountId}.json`);
-  await writeFile(tokenPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
+  const tempPath = join(tokensDir, `.${accountId}.${randomBytes(4).toString('hex')}.tmp`);
+  await writeFile(
+    tempPath,
+    JSON.stringify({
+      accessToken: tokens.accessToken,
+      ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
+      expiresAt: new Date(tokens.expiresAt).getTime(),
+    }, null, 2),
+    { mode: 0o600 },
+  );
+  await rename(tempPath, tokenPath);
+  await chmod(tokenPath, 0o600);
 }

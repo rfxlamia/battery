@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { pollOnce } from './poll-once.js';
+import { pollOnceWithMeta } from './poll-once.js';
 import type { BatteryState } from '../contracts/index.js';
 
 const POLL_INTERVAL_ACTIVE_MS = 60_000;
@@ -20,8 +20,20 @@ interface TickDeps {
  * Run a single poll-and-write cycle. Always writes state; returns summary.
  */
 export async function runLoopTick(deps: TickDeps): Promise<TickResult> {
-  const state = await pollOnce(deps);
+  const { state } = await pollOnceWithMeta(deps);
   return { wroteState: true, status: state.status };
+}
+
+export function getEffectiveInterval(
+  currentInterval: number,
+  consecutiveRateLimits: number,
+  retryAfterSeconds?: number,
+): number {
+  if (consecutiveRateLimits <= 0) return currentInterval;
+  const backoff = POLL_INTERVAL_ACTIVE_MS * 2 ** (consecutiveRateLimits - 1);
+  const cappedBackoff = Math.min(backoff, 600_000);
+  if (retryAfterSeconds === undefined) return cappedBackoff;
+  return Math.max(cappedBackoff, retryAfterSeconds * 1000);
 }
 
 /**
@@ -40,20 +52,26 @@ export function getServiceCommand(): string {
  */
 export async function runLoop(homeDir: string): Promise<never> {
   let consecutiveErrors = 0;
+  let consecutiveRateLimits = 0;
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
-    let intervalMs = POLL_INTERVAL_IDLE_MS;
+    let currentInterval = POLL_INTERVAL_IDLE_MS;
+    let retryAfterSeconds;
     try {
       const now = Date.now();
-      const state = await pollOnce({ fetchImpl: fetch, now, homeDir });
+      const { rateLimited, retryAfterSeconds: nextRetryAfterSeconds, sessionActive } =
+        await pollOnceWithMeta({ fetchImpl: fetch, now, homeDir });
       consecutiveErrors = 0;
-      intervalMs = state.session?.isActive ? POLL_INTERVAL_ACTIVE_MS : POLL_INTERVAL_IDLE_MS;
+      currentInterval = sessionActive ? POLL_INTERVAL_ACTIVE_MS : POLL_INTERVAL_IDLE_MS;
+      consecutiveRateLimits = rateLimited ? consecutiveRateLimits + 1 : 0;
+      retryAfterSeconds = nextRetryAfterSeconds;
     } catch (err) {
       consecutiveErrors += 1;
       console.error(`Battery core poll error (${consecutiveErrors}):`, err);
     }
 
+    const intervalMs = getEffectiveInterval(currentInterval, consecutiveRateLimits, retryAfterSeconds);
     await sleep(intervalMs);
   }
 }

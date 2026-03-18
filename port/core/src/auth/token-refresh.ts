@@ -1,9 +1,13 @@
 import type { StoredTokens } from '../storage/token-store.js';
 import { makeTokenError } from '../api/api-errors.js';
-import { ANTHROPIC_API_BASE_URL } from '../config/env.js';
+import {
+  BATTERY_USER_AGENT,
+  OAUTH_CLIENT_ID,
+  OAUTH_SCOPES,
+  OAUTH_TOKEN_URL,
+} from '../config/env.js';
 
 const REFRESH_BUFFER_SECONDS = 300;
-const ANTHROPIC_CLIENT_ID = 'claude-ai';
 
 interface RefreshOptions {
   force?: boolean;
@@ -34,26 +38,32 @@ export async function refreshIfNeeded(
     throw makeTokenError('no_refresh_token', 'No refresh token available — re-authentication required');
   }
 
-  const body = new URLSearchParams({
+  const body = JSON.stringify({
     grant_type: 'refresh_token',
     refresh_token: tokens.refreshToken,
-    client_id: ANTHROPIC_CLIENT_ID,
+    client_id: OAUTH_CLIENT_ID,
+    scope: OAUTH_SCOPES,
   });
 
   let response: Response;
   try {
-    response = await fetchImpl(`${ANTHROPIC_API_BASE_URL}/oauth/token`, {
+    response = await fetchImpl(OAUTH_TOKEN_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': BATTERY_USER_AGENT,
+      },
+      body,
     });
   } catch (err) {
     throw makeTokenError('network_error', `Network error during token refresh: ${String(err)}`);
   }
 
   if (!response.ok) {
+    const bodyText = await response.text().catch(() => '');
     throw makeTokenError('refresh_failed', `Token refresh failed with status ${response.status}`, {
       statusCode: response.status,
+      body: bodyText,
     });
   }
 

@@ -7,6 +7,7 @@ const MAX_RECENT_LINES = 20;
 const SESSION_ID_MAX_LEN = 128;
 const TOOL_MAX_LEN = 256;
 const STALENESS_THRESHOLD_SECONDS = 3600;
+const MAX_EVENTS_PER_SECOND = 50;
 
 /**
  * Read the last N lines of the events file, applying safety rules from Swift parity:
@@ -14,7 +15,8 @@ const STALENESS_THRESHOLD_SECONDS = 3600;
  * - Create the .battery directory (0700) and events.jsonl (0600) if missing.
  * - Silently drop lines over MAX_LINE_BYTES.
  * - Silently drop events with |timestamp - now| >= 3600s.
- * - Truncate sessionId/tool fields to max lengths.
+ * - Drop events whose sessionId/tool exceed the Swift length limits.
+ * - Drop events beyond the Swift 50 events/second admission limit.
  */
 export async function readRecentEvents(homeDir: string, nowMs: number): Promise<HookEvent[]> {
   const batteryDir = join(homeDir, '.battery');
@@ -51,6 +53,7 @@ export async function readRecentEvents(homeDir: string, nowMs: number): Promise<
   const recentLines = allLines.slice(-MAX_RECENT_LINES);
 
   const events: HookEvent[] = [];
+  const eventsPerSecond = new Map<number, number>();
   for (const line of recentLines) {
     // Drop lines over the byte limit
     if (Buffer.byteLength(line, 'utf8') > MAX_LINE_BYTES) continue;
@@ -68,12 +71,19 @@ export async function readRecentEvents(homeDir: string, nowMs: number): Promise<
     const eventMs = new Date(parsed.timestamp).getTime();
     if (isNaN(eventMs)) continue;
     if (Math.abs(nowMs - eventMs) / 1000 >= STALENESS_THRESHOLD_SECONDS) continue;
+    if (parsed.sessionId && String(parsed.sessionId).length > SESSION_ID_MAX_LEN) continue;
+    if (parsed.tool && String(parsed.tool).length > TOOL_MAX_LEN) continue;
+
+    const secondBucket = Math.floor(eventMs / 1000);
+    const currentCount = eventsPerSecond.get(secondBucket) ?? 0;
+    if (currentCount >= MAX_EVENTS_PER_SECOND) continue;
+    eventsPerSecond.set(secondBucket, currentCount + 1);
 
     events.push({
       event: parsed.event,
       timestamp: parsed.timestamp,
-      ...(parsed.sessionId ? { sessionId: String(parsed.sessionId).slice(0, SESSION_ID_MAX_LEN) } : {}),
-      ...(parsed.tool ? { tool: String(parsed.tool).slice(0, TOOL_MAX_LEN) } : {}),
+      ...(parsed.sessionId ? { sessionId: String(parsed.sessionId) } : {}),
+      ...(parsed.tool ? { tool: String(parsed.tool) } : {}),
     });
   }
 

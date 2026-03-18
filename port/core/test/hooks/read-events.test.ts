@@ -91,18 +91,18 @@ describe('readRecentEvents', () => {
     expect(events[19]).toMatchObject({ timestamp: ts(29) });
   });
 
-  it('truncates sessionId beyond 128 characters', async () => {
+  it('drops sessionId values beyond 128 characters', async () => {
     const longId = 'a'.repeat(200);
     await writeFile(eventsPath, `{"event":"SessionStart","timestamp":"${ts(0)}","sessionId":"${longId}"}\n`);
     const events = await readRecentEvents(homeDir, nowMs);
-    expect(events[0]?.sessionId).toHaveLength(128);
+    expect(events).toEqual([]);
   });
 
-  it('truncates tool name beyond 256 characters', async () => {
+  it('drops tool names beyond 256 characters', async () => {
     const longTool = 'T'.repeat(300);
     await writeFile(eventsPath, `{"event":"PostToolUse","timestamp":"${ts(0)}","sessionId":"s","tool":"${longTool}"}\n`);
     const events = await readRecentEvents(homeDir, nowMs);
-    expect(events[0]?.tool).toHaveLength(256);
+    expect(events).toEqual([]);
   });
 
   it('omits sessionId and tool keys entirely when absent (exactOptionalPropertyTypes)', async () => {
@@ -110,5 +110,14 @@ describe('readRecentEvents', () => {
     const events = await readRecentEvents(homeDir, nowMs);
     expect(events[0]).not.toHaveProperty('sessionId');
     expect(events[0]).not.toHaveProperty('tool');
+  });
+
+  it('drops events beyond the 50-per-second admission limit', async () => {
+    const lines = Array.from({ length: 55 }, (_, i) =>
+      `{"event":"PostToolUse","timestamp":"${ts(0)}","sessionId":"s${i}","tool":"Read"}`,
+    );
+    await writeFile(eventsPath, lines.join('\n') + '\n');
+    const events = await readRecentEvents(homeDir, nowMs);
+    expect(events).toHaveLength(20);
   });
 });

@@ -23,6 +23,24 @@ const fetchMock429 = async () =>
 const fetchMock500 = async () => new Response('Internal Server Error', { status: 500 });
 
 describe('fetchUsage', () => {
+  it('calls the OAuth usage endpoint with the Swift parity headers', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchSpy = async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return new Response(JSON.stringify(sample200), { status: 200 });
+    };
+
+    await fetchUsage(fetchSpy as typeof fetch, 'valid-token');
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('https://api.anthropic.com/api/oauth/usage');
+    expect(calls[0]?.init?.headers).toMatchObject({
+      Authorization: 'Bearer valid-token',
+      'anthropic-beta': 'oauth-2025-04-20',
+      'User-Agent': 'Battery/0.2.4',
+    });
+  });
+
   it('returns raw usage data on 200 (normalisation is build-state responsibility)', async () => {
     const result = await fetchUsage(fetchMock200, 'valid-token');
     expect(result).toMatchObject({

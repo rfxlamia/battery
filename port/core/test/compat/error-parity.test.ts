@@ -6,7 +6,7 @@ import { loadExpected, SAMPLE_200_RAW } from './compat-test-harness.js';
 import { fetchUsage } from '../../src/api/anthropic-api.js';
 import { pollOnce } from '../../src/runtime/poll-once.js';
 import { batteryStateSchema } from '../../src/contracts/index.js';
-import { ANTHROPIC_API_BASE_URL } from '../../src/config/env.js';
+import { OAUTH_TOKEN_URL } from '../../src/config/env.js';
 
 describe('error parity', () => {
   it('maps 401 to unauthorized error kind', async () => {
@@ -68,11 +68,10 @@ describe('auth lifecycle parity', () => {
       { mode: 0o600 },
     );
 
-    const oauthTokenUrl = `${ANTHROPIC_API_BASE_URL}/oauth/token`;
     let callCount = 0;
     const fetchImpl = async (url: string, init?: RequestInit) => {
       // Token refresh endpoint
-      if (url === oauthTokenUrl) {
+      if (url === OAUTH_TOKEN_URL) {
         return new Response(
           JSON.stringify({
             access_token: 'fresh-token',
@@ -150,9 +149,8 @@ describe('auth lifecycle parity', () => {
       { mode: 0o600 },
     );
 
-    const oauthTokenUrl = `${ANTHROPIC_API_BASE_URL}/oauth/token`;
     const fetchImpl = async (url: string) => {
-      if (url === oauthTokenUrl) {
+      if (url === OAUTH_TOKEN_URL) {
         return new Response(
           JSON.stringify({
             access_token: 'refreshed-token',

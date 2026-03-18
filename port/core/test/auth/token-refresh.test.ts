@@ -44,6 +44,29 @@ describe('refreshIfNeeded', () => {
     expect(result.refreshToken).toBe('new-refresh-token');
   });
 
+  it('uses the Swift parity token endpoint and request body', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchSpy = async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return successRefreshFetch(String(url), init);
+    };
+
+    await refreshIfNeeded(expiringTokens, fetchSpy as typeof fetch);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('https://platform.claude.com/v1/oauth/token');
+    expect(calls[0]?.init?.headers).toMatchObject({
+      'Content-Type': 'application/json',
+      'User-Agent': 'Battery/0.2.4',
+    });
+    expect(JSON.parse(String(calls[0]?.init?.body))).toMatchObject({
+      grant_type: 'refresh_token',
+      refresh_token: 'rt-valid',
+      client_id: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
+      scope: 'user:profile user:inference',
+    });
+  });
+
   it('throws no_refresh_token when refresh is needed but no refresh token exists', async () => {
     await expect(refreshIfNeeded(tokensWithoutRefresh, successRefreshFetch)).rejects.toMatchObject({
       kind: 'no_refresh_token',

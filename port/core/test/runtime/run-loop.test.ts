@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getServiceCommand, runLoopTick } from '../../src/runtime/run-loop.js';
+import { getEffectiveInterval, getServiceCommand, runLoopTick } from '../../src/runtime/run-loop.js';
 
 const sample200 = {
   five_hour: { utilization: 10.0, resets_at: '2026-03-17T13:00:00Z' },
@@ -12,6 +12,25 @@ const sample200 = {
 describe('getServiceCommand', () => {
   it('contains node', () => {
     expect(getServiceCommand()).toContain('node');
+  });
+});
+
+describe('getEffectiveInterval', () => {
+  it('returns the current interval when not rate limited', () => {
+    expect(getEffectiveInterval(300_000, 0)).toBe(300_000);
+  });
+
+  it('applies exponential backoff from 60s to 600s', () => {
+    expect(getEffectiveInterval(300_000, 1)).toBe(60_000);
+    expect(getEffectiveInterval(300_000, 2)).toBe(120_000);
+    expect(getEffectiveInterval(300_000, 3)).toBe(240_000);
+    expect(getEffectiveInterval(300_000, 4)).toBe(480_000);
+    expect(getEffectiveInterval(300_000, 5)).toBe(600_000);
+    expect(getEffectiveInterval(300_000, 6)).toBe(600_000);
+  });
+
+  it('honors retry-after when it exceeds the computed backoff', () => {
+    expect(getEffectiveInterval(300_000, 1, 180)).toBe(180_000);
   });
 });
 
