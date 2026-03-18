@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { getHomeDir } from './config/env.js';
-import { getBatteryPaths } from './config/paths.js';
+import { pollOnce } from './runtime/poll-once.js';
 
 async function main(): Promise<void> {
   const homeDir = getHomeDir();
-  const paths = getBatteryPaths(homeDir);
-  console.log(`Battery core starting (state: ${paths.stateFile})`);
+  const state = await pollOnce({ fetchImpl: fetch, now: Date.now(), homeDir });
+  console.log(`Battery core: status=${state.status}`);
 }
 
 main().catch((err: unknown) => {
