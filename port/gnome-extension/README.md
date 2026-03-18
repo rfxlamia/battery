@@ -53,12 +53,25 @@ After enabling the extension, **Battery** should appear in the GNOME top bar sho
 | Stale data | `Battery Stale` |
 | Error | `Battery Error` |
 
+## Core service dependency
+
+The extension expects `battery-core.service` to be active and writing `~/.battery/state.json`.
+
+- If the core service is not running, the extension will show `Battery Stale`.
+- Install verification will fail loudly if the extension is present but the core service is missing.
+
 ## Stale state
 
-`Battery Stale` means the core service has not updated `~/.battery/state.json` within the expected window. Check that `battery-core.service` is active:
+`Battery Stale` means the core service has not updated `~/.battery/state.json` within the expected freshness window. Check that the core service is active:
 
 ```bash
 systemctl --user status battery-core.service
+```
+
+If the service is inactive, start it:
+
+```bash
+systemctl --user start battery-core.service
 ```
 
 ## Verify install
@@ -66,6 +79,13 @@ systemctl --user status battery-core.service
 ```bash
 ./scripts/check-install.sh
 ```
+
+The script checks:
+1. `extension.js` is present in the extensions directory
+2. The extension is known to GNOME Shell
+3. `battery-core.service` is active
+
+It exits non-zero with a clear message if any check fails.
 
 ## Development
 
