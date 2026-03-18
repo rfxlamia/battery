@@ -24,8 +24,8 @@ export async function runLoopTick(deps: TickDeps): Promise<TickResult> {
   return { wroteState: true, status: state.status };
 }
 
-export function getPollingIntervalMs(status: BatteryState['status'], sessionActive: boolean): number {
-  return status === 'ok' && sessionActive ? POLL_INTERVAL_ACTIVE_MS : POLL_INTERVAL_IDLE_MS;
+export function getPollingIntervalMs(sessionActive: boolean): number {
+  return sessionActive ? POLL_INTERVAL_ACTIVE_MS : POLL_INTERVAL_IDLE_MS;
 }
 
 export function getEffectiveInterval(
@@ -64,10 +64,10 @@ export async function runLoop(homeDir: string): Promise<never> {
     let retryAfterSeconds;
     try {
       const now = Date.now();
-      const { state, rateLimited, retryAfterSeconds: nextRetryAfterSeconds, sessionActive } =
+      const { rateLimited, retryAfterSeconds: nextRetryAfterSeconds, sessionActive } =
         await pollOnceWithMeta({ fetchImpl: fetch, now, homeDir });
       consecutiveErrors = 0;
-      currentInterval = getPollingIntervalMs(state.status, sessionActive);
+      currentInterval = getPollingIntervalMs(sessionActive);
       consecutiveRateLimits = rateLimited ? consecutiveRateLimits + 1 : 0;
       retryAfterSeconds = nextRetryAfterSeconds;
     } catch (err) {

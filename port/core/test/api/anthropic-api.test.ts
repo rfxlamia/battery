@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fetchUsage } from '../../src/api/anthropic-api.js';
 
 const sample200 = {
@@ -75,6 +78,24 @@ describe('fetchUsage', () => {
     await expect(fetchUsage(fetchMockInvalid429 as typeof fetch, 'token')).rejects.not.toHaveProperty(
       'retryAfterSeconds',
     );
+  });
+
+  it('still surfaces rate_limited when local rate-limit logging fails', async () => {
+    const homeDirFile = await mkdtemp(join(tmpdir(), 'battery-home-file-'));
+    const fakeHome = join(homeDirFile, 'not-a-directory');
+    await writeFile(fakeHome, 'occupied');
+
+    const previousHome = process.env['HOME'];
+    process.env['HOME'] = fakeHome;
+    try {
+      await expect(fetchUsage(fetchMock429, 'token')).rejects.toMatchObject({
+        kind: 'rate_limited',
+        retryAfterSeconds: 60,
+      });
+    } finally {
+      if (previousHome === undefined) delete process.env['HOME'];
+      else process.env['HOME'] = previousHome;
+    }
   });
 
   it('throws server_error on 500', async () => {

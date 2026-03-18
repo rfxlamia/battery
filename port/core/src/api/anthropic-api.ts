@@ -62,7 +62,7 @@ export async function fetchUsage(
     const body = await response.text().catch(() => '');
     const retryAfterHeader = response.headers.get('Retry-After');
     const retryAfterSeconds = parseRetryAfterSeconds(retryAfterHeader);
-    await logRateLimitDetails(response, body);
+    await logRateLimitDetails(response, body).catch(() => {});
     throw makeApiError(
       'rate_limited',
       'Rate limit exceeded',

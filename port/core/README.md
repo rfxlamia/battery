@@ -6,7 +6,7 @@ Linux background service for Battery.
 
 ```bash
 cd port/core
-npm install
+npm ci
 ./install-local.sh
 ```
 

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/battery/core"
-UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+TARGET_DIR="$HOME/.local/share/battery/core"
+UNIT_DIR="$HOME/.config/systemd/user"
 
 cd "$SCRIPT_DIR"
 npm ci

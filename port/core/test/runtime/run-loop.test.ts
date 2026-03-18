@@ -40,16 +40,12 @@ describe('getEffectiveInterval', () => {
 });
 
 describe('getPollingIntervalMs', () => {
-  it('uses the active interval only for active ok states', () => {
-    expect(getPollingIntervalMs('ok', true)).toBe(60_000);
+  it('uses the active interval for active sessions', () => {
+    expect(getPollingIntervalMs(true)).toBe(60_000);
   });
 
-  it('uses the idle interval for active login_required states', () => {
-    expect(getPollingIntervalMs('login_required', true)).toBe(300_000);
-  });
-
-  it('uses the idle interval for active error states', () => {
-    expect(getPollingIntervalMs('error', true)).toBe(300_000);
+  it('uses the idle interval for inactive sessions', () => {
+    expect(getPollingIntervalMs(false)).toBe(300_000);
   });
 });
 
