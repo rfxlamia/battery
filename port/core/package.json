@@ -2,10 +2,16 @@
   "name": "@battery/core",
   "private": true,
   "type": "module",
+  "main": "dist/main.js",
+  "bin": {
+    "battery-core": "dist/main.js"
+  },
   "scripts": {
     "test": "vitest run",
     "test:contracts": "vitest run test/contracts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build": "tsc",
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "zod": "^4.1.0"
