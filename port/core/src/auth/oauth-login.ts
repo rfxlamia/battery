@@ -49,7 +49,7 @@ export async function exchangeCodeForTokens(params: ExchangeParams): Promise<Tok
 
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token,
+    ...(data.refresh_token ? { refreshToken: data.refresh_token } : {}),
     expiresIn: data.expires_in ?? 3600,
   };
 }

@@ -15,7 +15,7 @@ import {
 import type { TokenError } from '../api/api-errors.js';
 import type { ApiError } from '../api/api-errors.js';
 
-interface PollDeps {
+export interface PollDeps {
   fetchImpl: typeof fetch;
   now: number;
   homeDir: string;
