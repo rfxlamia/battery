@@ -28,6 +28,14 @@ export function getPollingIntervalMs(sessionActive: boolean): number {
   return sessionActive ? POLL_INTERVAL_ACTIVE_MS : POLL_INTERVAL_IDLE_MS;
 }
 
+export function getNextPollingInterval(
+  currentInterval: number,
+  sessionActive?: boolean,
+): number {
+  if (sessionActive === undefined) return currentInterval;
+  return getPollingIntervalMs(sessionActive);
+}
+
 export function getEffectiveInterval(
   currentInterval: number,
   consecutiveRateLimits: number,
@@ -57,17 +65,17 @@ export function getServiceCommand(): string {
 export async function runLoop(homeDir: string): Promise<never> {
   let consecutiveErrors = 0;
   let consecutiveRateLimits = 0;
+  let currentInterval = POLL_INTERVAL_IDLE_MS;
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
-    let currentInterval = POLL_INTERVAL_IDLE_MS;
     let retryAfterSeconds;
     try {
       const now = Date.now();
       const { rateLimited, retryAfterSeconds: nextRetryAfterSeconds, sessionActive } =
         await pollOnceWithMeta({ fetchImpl: fetch, now, homeDir });
       consecutiveErrors = 0;
-      currentInterval = getPollingIntervalMs(sessionActive);
+      currentInterval = getNextPollingInterval(currentInterval, sessionActive);
       consecutiveRateLimits = rateLimited ? consecutiveRateLimits + 1 : 0;
       retryAfterSeconds = nextRetryAfterSeconds;
     } catch (err) {

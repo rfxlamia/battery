@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   getEffectiveInterval,
+  getNextPollingInterval,
   getPollingIntervalMs,
   getServiceCommand,
   runLoopTick,
@@ -46,6 +47,17 @@ describe('getPollingIntervalMs', () => {
 
   it('uses the idle interval for inactive sessions', () => {
     expect(getPollingIntervalMs(false)).toBe(300_000);
+  });
+});
+
+describe('getNextPollingInterval', () => {
+  it('preserves the previous interval when the poll fails before session activity is known', () => {
+    expect(getNextPollingInterval(60_000)).toBe(60_000);
+  });
+
+  it('updates the interval when session activity is available', () => {
+    expect(getNextPollingInterval(300_000, true)).toBe(60_000);
+    expect(getNextPollingInterval(60_000, false)).toBe(300_000);
   });
 });
 
