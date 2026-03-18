@@ -1,0 +1,6 @@
+{"_note": "stop hook event scenario. The stop event is processed identically to PostToolUse: activates session if not active, resets the idle timer. This fixture confirms the dispatch table must handle 'stop' the same as 'PostToolUse'."}
+{"event":"SessionStart","timestamp":"2026-03-17T10:00:00Z","sessionId":"ghi789"}
+{"event":"PostToolUse","timestamp":"2026-03-17T10:01:00Z","sessionId":"ghi789","tool":"Bash"}
+{"event":"stop","timestamp":"2026-03-17T10:02:30Z","sessionId":"ghi789"}
+{"event":"PostToolUse","timestamp":"2026-03-17T10:04:00Z","sessionId":"ghi789","tool":"Read"}
+{"event":"SessionEnd","timestamp":"2026-03-17T10:05:00Z","sessionId":"ghi789"}

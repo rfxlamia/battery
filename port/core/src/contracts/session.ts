@@ -17,11 +17,17 @@ export const accountSchema = z.object({
 });
 
 /**
- * Active session usage within the current billing window.
- * Deferred parity fields (opus, sonnet, extraUsage) are tracked separately
- * and must remain absent in the MVP shape.
+ * Active session usage within the current billing window (5-hour window).
  *
- * `utilization` is a non-negative number. Values above 1.0 represent overrun.
+ * `utilization` is a normalized fraction (0.0–1.0). The API returns percent scale (0–100);
+ * the TypeScript core must divide by 100 before writing to this field.
+ * Values above 1.0 represent overrun.
+ *
+ * Deferred parity fields — intentionally absent from MVP contract:
+ * - `sonnetUtilization`, `opusUtilization`: per-model session utilization
+ * - `extraUsage`: extra credits usage
+ * - `burnRate` / `projectedLimitTime` / `projectedAtReset`: OLS regression projection (BurnRateCalculator.swift)
+ * - `usageLevel`: ColorThresholds.swift UsageLevel enum (low/medium/high/critical)
  */
 export const sessionSchema = z.object({
   utilization: z.number().min(0),

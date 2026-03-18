@@ -72,6 +72,15 @@ Called by `UsagePollingService.retryWithForceRefresh()` when a 401 is received.
 | `refreshFailed(statusCode, body)` | Non-200 response from token endpoint |
 | `networkError(Error)` | Network-level failure during token refresh |
 
+### Token error → contract state mapping
+
+| Swift error | Contract mapping |
+| --- | --- |
+| `noRefreshToken` | `status = 'login_required'`; no `error` field — user must log in, not a transient error |
+| `refreshFailed(4xx, body)` | `status = 'login_required'`; treat as auth failure (credentials rejected by server) |
+| `refreshFailed(5xx, body)` | `status = 'error'`, `error.kind = 'server_error'` |
+| `networkError` | `status = 'error'`, `error.kind = 'network_error'` |
+
 ---
 
 ## API Error Handling (`AnthropicAPI.swift`)
@@ -109,6 +118,23 @@ Called by `UsagePollingService.retryWithForceRefresh()` when a 401 is received.
 Usage API requests (`AnthropicAPI.fetchUsage`) have a 15-second timeout (`request.timeoutInterval = 15`).
 
 Token exchange and refresh requests (`OAuthService`, `TokenRefreshService`) do **not** set a custom timeout — they use `URLSession`'s default of 60 seconds.
+
+---
+
+## `needsReauth` → Contract State Mapping
+
+`needsReauth = true` in Swift maps to `status = 'login_required'` in the contract.
+The `error` field must be **absent** when `login_required` is emitted — this status signals
+"user must authenticate", not a transient error. The GNOME extension should show a sign-in
+prompt, not an error message.
+
+| Swift state | `BatteryState.status` | `BatteryState.error` |
+| --- | --- | --- |
+| `needsReauth = false`, usage loaded | `'ok'` | absent |
+| `needsReauth = true` | `'login_required'` | absent |
+| `isUnauthorized`, before force-refresh | `'loading'` | absent |
+| 429 received | `'ok'` (cached) or `'error'` | `{ kind: 'rate_limited', retryAfterSeconds }` |
+| 5xx / network failure | `'error'` | `{ kind: 'server_error' \| 'network_error' }` |
 
 ---
 

@@ -1,4 +1,6 @@
 {
+  "_note": "Successful 200 response from the Anthropic usage API. All utilization values are in percent scale (0–100) as returned by the API. The TypeScript core must divide by 100 before writing to the contract schema (which stores normalized 0.0–1.0). Example: 42.5 here → 0.425 in BatteryState.session.utilization.",
+  "_http_status": 200,
   "five_hour": {
     "utilization": 42.5,
     "resets_at": "2026-03-17T13:00:00Z"

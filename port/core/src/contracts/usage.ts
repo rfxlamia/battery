@@ -3,10 +3,17 @@ import { isoDateTime } from './primitives.js';
 
 /**
  * Rolling weekly usage window.
- * Deferred parity fields (opus, sonnet, extraUsage) are tracked separately
- * and must remain absent in the MVP shape.
  *
- * `utilization` is a non-negative number. Values above 1.0 represent overrun.
+ * `utilization` is a normalized fraction (0.0–1.0). The API returns percent scale (0–100);
+ * the TypeScript core must divide by 100 before writing to this field.
+ * Values above 1.0 represent overrun.
+ *
+ * Deferred parity fields — intentionally absent from MVP contract:
+ * - `sonnetUtilization`, `opusUtilization`: per-model 7-day utilization (API fields seven_day_sonnet, seven_day_opus)
+ * - `extraUsage`: extra credits usage object (API field extra_usage)
+ * - `burnRate` / `projectedLimitTime` / `projectedAtReset`: OLS regression projection from BurnRateCalculator.swift
+ * - `usageLevel` / color thresholds: ColorThresholds.swift UsageLevel enum (low/medium/high/critical)
+ * - `todayPeakSeen`, `activeDays`, `dailyPeaks`: heatmap / sparkline display data from UsageViewModel.swift
  */
 export const weeklySchema = z.object({
   utilization: z.number().min(0),

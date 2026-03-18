@@ -1,3 +1,5 @@
+{"_note": "Idle timeout scenario. Session starts, two tool events fire, then no further events arrive. checkIdle() fires at 09:08 (5-minute timer). Finds now - lastActivity >= 300s. Clears session: isActive → false, sessionId cleared."}
 {"event":"SessionStart","timestamp":"2026-03-17T09:00:00Z","sessionId":"def456"}
 {"event":"PostToolUse","timestamp":"2026-03-17T09:02:00Z","sessionId":"def456","tool":"Bash"}
 {"event":"PostToolUse","timestamp":"2026-03-17T09:03:00Z","sessionId":"def456","tool":"Read"}
+{"_note": "No further events. lastActivity = 09:03:00Z. checkIdle() fires at 09:08:00Z (300s after last activity). Expected post-timeout state: isActive=false, utilization preserved from last API response, resetsAt unchanged."}

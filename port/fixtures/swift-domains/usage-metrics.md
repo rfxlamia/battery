@@ -15,11 +15,19 @@ Sources:
 - `sessionResetsAt` is derived from `UsageResponse.fiveHour.resetsAtDate`.
 - When `fiveHour` is `nil`, `projection` is cleared to `nil`.
 
+> **Scale transformation (required):** The API returns utilization as percent scale (0–100).
+> The contract schema (`BatteryState.session.utilization`) stores normalized 0.0–1.0.
+> The TypeScript core **must divide by 100** before writing to the contract.
+> Example: API returns `42.5` → contract stores `0.425`.
+> The `sample-200.json` fixture shows raw API values; the transformation happens in the core layer.
+
 ## Weekly Utilization
 
 - Sourced from `UsageResponse.sevenDay.utilization`.
 - Always present (non-optional) unlike `fiveHour`.
 - `weeklyResetsAt` from `UsageResponse.sevenDay.resetsAtDate`.
+
+> **Scale transformation (required):** Same 0–100 → 0.0–1.0 normalization applies to `seven_day.utilization`.
 
 ## Per-model Utilization (optional fields)
 

@@ -1,7 +1,7 @@
 # Swift Parity Matrix
 
-| Domain | Swift Source | Required Parity | Notes | Allowed Differences |
-| --- | --- | --- | --- | --- |
-| Session state | `Sources/Services/HookFileWatcher.swift` | Yes | Match event ordering, idle timeout (300s), and active-session inference on startup | File-watching mechanism (inotify on Linux) |
-| Usage metrics | `Sources/ViewModels/UsageViewModel.swift` | Yes | Match utilization fields, burn-rate regression, threshold/debounce values, time formatting | Notification delivery (libnotify/DBus), color/symbol rendering |
-| Errors and auth | `Sources/Services/AnthropicAPI.swift` | Yes | Match token refresh buffer (300s), 401 retry, rate-limit backoff (60s base, 600s max) | Browser launch (xdg-open), token storage (libsecret), notification delivery, OAuth callback server implementation |
+| Domain | Swift Sources | Required Parity | Notes | Allowed Differences | Fixture Candidates |
+| --- | --- | --- | --- | --- | --- |
+| Session state | `Sources/Services/HookFileWatcher.swift` | Yes | Match event ordering, idle timeout (300s), active-session inference on startup, `stop` event semantics | File-watching mechanism (inotify on Linux) | `examples/hook-events/session-start-stop.jsonl`, `examples/hook-events/idle-timeout.jsonl`, `examples/hook-events/stop-event.jsonl` |
+| Usage metrics | `Sources/ViewModels/UsageViewModel.swift`, `Sources/Utilities/BurnRateCalculator.swift`, `Sources/Utilities/TimeFormatting.swift`, `Sources/Utilities/ColorThresholds.swift` | Yes | Match utilization fields (API percent scale 0–100 → normalize to 0.0–1.0), burn-rate regression, threshold/debounce values, time formatting | Notification delivery (libnotify/DBus), color/symbol rendering | `examples/usage-api/sample-200.json`, `examples/usage-api/sample-401.json`, `examples/usage-api/sample-429.json` |
+| Errors and auth | `Sources/Services/AnthropicAPI.swift`, `Sources/Services/OAuthService.swift`, `Sources/Services/TokenRefreshService.swift`, `Sources/Services/NotificationService.swift` | Yes | Match token refresh buffer (300s), 401 retry, rate-limit backoff (60s base, 600s max), `noRefreshToken` → `login_required` state mapping | Browser launch (xdg-open), token storage (libsecret), notification delivery, OAuth callback server implementation | `examples/auth/token-refresh-failure.md` |
