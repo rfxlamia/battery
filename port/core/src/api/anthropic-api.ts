@@ -1,3 +1,5 @@
+import { appendFile, chmod, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { makeApiError, type ApiError } from './api-errors.js';
 import {
   ANTHROPIC_API_BASE_URL,
@@ -57,8 +59,10 @@ export async function fetchUsage(
   }
 
   if (response.status === 429) {
+    const body = await response.text().catch(() => '');
     const retryAfterHeader = response.headers.get('Retry-After');
-    const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : undefined;
+    const retryAfterSeconds = parseRetryAfterSeconds(retryAfterHeader);
+    await logRateLimitDetails(response, body);
     throw makeApiError(
       'rate_limited',
       'Rate limit exceeded',
@@ -89,4 +93,38 @@ export async function fetchUsage(
       resetsAt: raw.seven_day.resets_at,
     },
   };
+}
+
+function parseRetryAfterSeconds(retryAfterHeader: string | null): number | undefined {
+  if (!retryAfterHeader) return undefined;
+  const parsed = Number.parseInt(retryAfterHeader, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+async function logRateLimitDetails(response: Response, body: string): Promise<void> {
+  const homeDir = process.env['HOME'];
+  if (!homeDir) return;
+
+  const batteryDir = join(homeDir, '.battery');
+  const logPath = join(batteryDir, 'rate-limits.log');
+  await mkdir(batteryDir, { recursive: true, mode: 0o700 });
+
+  const timestamp = new Date().toISOString();
+  const headerLines: string[] = [];
+  for (const [key, value] of response.headers.entries()) {
+    const lower = key.toLowerCase();
+    if (lower.includes('ratelimit') || lower.includes('rate-limit') || lower === 'retry-after') {
+      headerLines.push(`  ${key}: ${value}`);
+    }
+  }
+
+  const lines = [
+    `[${timestamp}] 429 Rate Limited`,
+    ...headerLines,
+    ...(body ? [`  Body: ${body}`] : []),
+    '',
+  ];
+
+  await appendFile(logPath, `${lines.join('\n')}\n`, { encoding: 'utf8', mode: 0o600 });
+  await chmod(logPath, 0o600);
 }

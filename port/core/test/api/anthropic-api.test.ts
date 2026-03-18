@@ -62,6 +62,21 @@ describe('fetchUsage', () => {
     });
   });
 
+  it('omits retryAfterSeconds when Retry-After is not numeric', async () => {
+    const fetchMockInvalid429 = async () =>
+      new Response(JSON.stringify({ error: { type: 'rate_limit_error' } }), {
+        status: 429,
+        headers: { 'Retry-After': 'tomorrow' },
+      });
+
+    await expect(fetchUsage(fetchMockInvalid429 as typeof fetch, 'token')).rejects.toMatchObject({
+      kind: 'rate_limited',
+    });
+    await expect(fetchUsage(fetchMockInvalid429 as typeof fetch, 'token')).rejects.not.toHaveProperty(
+      'retryAfterSeconds',
+    );
+  });
+
   it('throws server_error on 500', async () => {
     await expect(fetchUsage(fetchMock500, 'token')).rejects.toMatchObject({
       kind: 'server_error',

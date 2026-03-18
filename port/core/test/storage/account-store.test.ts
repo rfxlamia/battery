@@ -75,4 +75,31 @@ describe('readSelectedAccount', () => {
     const account = await readSelectedAccount(tmpDir);
     expect(account).toMatchObject({ id: 'acct-1' });
   });
+
+  it('prefers a persisted selected-account-id over isDefault fallback', async () => {
+    await writeFile(
+      join(tmpDir, '.battery', 'accounts.json'),
+      JSON.stringify([
+        { id: 'acct-1', name: 'Alice', planTier: 'pro', isDefault: true },
+        { id: 'acct-2', name: 'Bob', planTier: 'max', isDefault: false },
+      ]),
+    );
+    await writeFile(join(tmpDir, '.battery', 'selected-account-id'), 'acct-2\n');
+
+    const account = await readSelectedAccount(tmpDir);
+    expect(account).toMatchObject({ id: 'acct-2' });
+  });
+
+  it('falls back to the Swift default when mixed-format accounts have no portable selection', async () => {
+    await writeFile(
+      join(tmpDir, '.battery', 'accounts.json'),
+      JSON.stringify([
+        { id: 'acct-1', name: 'Portable Alice', planTier: 'pro', selected: false },
+        { id: 'acct-2', name: 'Swift Bob', planTier: 'max', isDefault: true },
+      ]),
+    );
+
+    const account = await readSelectedAccount(tmpDir);
+    expect(account).toMatchObject({ id: 'acct-2' });
+  });
 });

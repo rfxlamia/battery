@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pollOnce } from '../../src/runtime/poll-once.js';
@@ -15,6 +15,11 @@ const mockFetch200 = async (_url: string) =>
 
 const mockFetch401 = async (_url: string) =>
   new Response(JSON.stringify({ error: { type: 'authentication_error' } }), { status: 401 });
+const mockFetch429 = async (_url: string) =>
+  new Response(JSON.stringify({ error: { type: 'rate_limit_error' } }), {
+    status: 429,
+    headers: { 'Retry-After': '120' },
+  });
 
 describe('pollOnce', () => {
   let homeDir: string;
@@ -38,7 +43,7 @@ describe('pollOnce', () => {
       JSON.stringify({
         accessToken: 'valid-token',
         refreshToken: 'rt-valid',
-        expiresAt: new Date(now + 2 * 3600 * 1000).toISOString(),
+        expiresAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
       }),
       { mode: 0o600 },
     );
@@ -86,11 +91,72 @@ describe('pollOnce', () => {
       join(homeDir, '.battery', 'tokens', 'acct-1.json'),
       JSON.stringify({
         accessToken: 'bad-token',
-        expiresAt: new Date(now + 2 * 3600 * 1000).toISOString(),
+        expiresAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
       }),
       { mode: 0o600 },
     );
     const state = await pollOnce({ fetchImpl: mockFetch401 as typeof fetch, now, homeDir });
     expect(state.status).toBe('login_required');
+  });
+
+  it('treats refresh endpoint 429 as a transient error instead of login_required', async () => {
+    await writeFile(
+      join(homeDir, '.battery', 'tokens', 'acct-1.json'),
+      JSON.stringify({
+        accessToken: 'expiring-token',
+        refreshToken: 'rt-valid',
+        expiresAt: new Date(Date.now() + 60 * 1000).toISOString(),
+      }),
+      { mode: 0o600 },
+    );
+
+    const refreshRateLimitedFetch = async (url: string) => {
+      if (url.includes('/oauth/token')) {
+        return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429 });
+      }
+      return new Response(JSON.stringify(sample200), { status: 200 });
+    };
+
+    const state = await pollOnce({
+      fetchImpl: refreshRateLimitedFetch as typeof fetch,
+      now,
+      homeDir,
+    });
+
+    expect(state.status).toBe('error');
+    expect(state.error?.kind).toBe('server_error');
+  });
+
+  it('rewrites cached ok state on 429 so the GNOME extension does not go stale', async () => {
+    await writeFile(
+      join(homeDir, '.battery', 'state.json'),
+      JSON.stringify({
+        version: 1,
+        status: 'ok',
+        updatedAt: '2026-03-17T08:00:00.000Z',
+        account: { id: 'acct-1', name: 'Alice', planTier: 'pro', isSelected: true },
+        session: { utilization: 0.42, resetsAt: '2026-03-17T13:00:00Z', isActive: false },
+        weekly: { utilization: 0.61, resetsAt: '2026-03-23T00:00:00Z' },
+        freshness: { staleAfterSeconds: 300 },
+      }),
+    );
+    await writeFile(
+      join(homeDir, '.battery', 'events.jsonl'),
+      JSON.stringify({
+        event: 'SessionStart',
+        timestamp: new Date(now).toISOString(),
+        sessionId: 's-1',
+      }) + '\n',
+    );
+
+    const state = await pollOnce({ fetchImpl: mockFetch429 as typeof fetch, now, homeDir });
+    const writtenState = JSON.parse(await readFile(join(homeDir, '.battery', 'state.json'), 'utf8'));
+
+    expect(state.status).toBe('ok');
+    expect(state.updatedAt).toBe(new Date(now).toISOString());
+    expect(state.session?.isActive).toBe(true);
+    expect(state.freshness.staleAfterSeconds).toBe(600);
+    expect(writtenState.updatedAt).toBe(new Date(now).toISOString());
+    expect(writtenState.session.isActive).toBe(true);
   });
 });

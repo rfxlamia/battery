@@ -6,7 +6,12 @@ import { refreshIfNeeded } from '../auth/token-refresh.js';
 import { fetchUsage } from '../api/anthropic-api.js';
 import { readRecentEvents } from '../hooks/read-events.js';
 import { reduceSessionState } from '../hooks/session-reducer.js';
-import { buildOkState, buildLoginRequiredState, buildErrorState } from './build-state.js';
+import {
+  buildOkState,
+  buildCachedOkState,
+  buildLoginRequiredState,
+  buildErrorState,
+} from './build-state.js';
 import type { TokenError } from '../api/api-errors.js';
 import type { ApiError } from '../api/api-errors.js';
 
@@ -56,6 +61,11 @@ export async function pollOnceWithMeta(deps: PollDeps): Promise<PollOutcome> {
       return { state, rateLimited: false, sessionActive: session.isActive };
     }
     if (tokenErr.kind === 'refresh_failed') {
+      if (tokenErr.statusCode === 429) {
+        const state = buildErrorState('server_error', tokenErr.message, now);
+        await writeStateFile(homeDir, state);
+        return { state, rateLimited: false, sessionActive: session.isActive };
+      }
       if (tokenErr.statusCode !== undefined && tokenErr.statusCode >= 500) {
         const state = buildErrorState('server_error', tokenErr.message, now);
         await writeStateFile(homeDir, state);
@@ -99,6 +109,11 @@ export async function pollOnceWithMeta(deps: PollDeps): Promise<PollOutcome> {
         }
         if ((retryApiErr as TokenError).kind === 'refresh_failed') {
           const refreshErr = retryApiErr as TokenError;
+          if (refreshErr.statusCode === 429) {
+            const state = buildErrorState('server_error', refreshErr.message, now);
+            await writeStateFile(homeDir, state);
+            return { state, rateLimited: false, sessionActive: session.isActive };
+          }
           if (refreshErr.statusCode !== undefined && refreshErr.statusCode >= 500) {
             const state = buildErrorState('server_error', refreshErr.message, now);
             await writeStateFile(homeDir, state);
@@ -121,8 +136,15 @@ export async function pollOnceWithMeta(deps: PollDeps): Promise<PollOutcome> {
       if (apiErr.kind === 'rate_limited') {
         const cachedState = await readStateFile(homeDir);
         if (cachedState?.status === 'ok') {
+          const refreshedCachedState = buildCachedOkState(
+            cachedState,
+            session,
+            now,
+            Math.max(apiErr.retryAfterSeconds ?? 0, 600),
+          );
+          await writeStateFile(homeDir, refreshedCachedState);
           return {
-            state: cachedState,
+            state: refreshedCachedState,
             rateLimited: true,
             sessionActive: session.isActive,
             ...(apiErr.retryAfterSeconds !== undefined

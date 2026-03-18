@@ -29,7 +29,7 @@ describe('contract parity', () => {
       JSON.stringify({
         accessToken: 'valid-token',
         refreshToken: 'rt-valid',
-        expiresAt: new Date(now + 2 * 3600 * 1000).toISOString(),
+        expiresAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
       }),
       { mode: 0o600 },
     );

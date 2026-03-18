@@ -2,7 +2,12 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getEffectiveInterval, getServiceCommand, runLoopTick } from '../../src/runtime/run-loop.js';
+import {
+  getEffectiveInterval,
+  getPollingIntervalMs,
+  getServiceCommand,
+  runLoopTick,
+} from '../../src/runtime/run-loop.js';
 
 const sample200 = {
   five_hour: { utilization: 10.0, resets_at: '2026-03-17T13:00:00Z' },
@@ -34,6 +39,20 @@ describe('getEffectiveInterval', () => {
   });
 });
 
+describe('getPollingIntervalMs', () => {
+  it('uses the active interval only for active ok states', () => {
+    expect(getPollingIntervalMs('ok', true)).toBe(60_000);
+  });
+
+  it('uses the idle interval for active login_required states', () => {
+    expect(getPollingIntervalMs('login_required', true)).toBe(300_000);
+  });
+
+  it('uses the idle interval for active error states', () => {
+    expect(getPollingIntervalMs('error', true)).toBe(300_000);
+  });
+});
+
 describe('runLoopTick', () => {
   let homeDir: string;
   const now = new Date('2026-03-17T09:00:00Z').getTime();
@@ -50,7 +69,7 @@ describe('runLoopTick', () => {
       JSON.stringify({
         accessToken: 'valid-token',
         refreshToken: 'rt-valid',
-        expiresAt: new Date(now + 2 * 3600 * 1000).toISOString(),
+        expiresAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
       }),
       { mode: 0o600 },
     );

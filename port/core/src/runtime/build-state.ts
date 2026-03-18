@@ -41,6 +41,31 @@ export function buildOkState(
   };
 }
 
+export function buildCachedOkState(
+  cachedState: BatteryState,
+  session: SessionState,
+  nowMs: number,
+  staleAfterSeconds: number,
+): BatteryState {
+  if (cachedState.status !== 'ok') {
+    return buildErrorState('server_error', 'Cached state was not reusable', nowMs);
+  }
+
+  return {
+    ...cachedState,
+    updatedAt: new Date(nowMs).toISOString(),
+    freshness: { staleAfterSeconds },
+    ...(cachedState.session
+      ? {
+          session: {
+            ...cachedState.session,
+            isActive: session.isActive,
+          },
+        }
+      : {}),
+  };
+}
+
 export function buildLoginRequiredState(nowMs: number): BatteryState {
   return {
     version: 1,

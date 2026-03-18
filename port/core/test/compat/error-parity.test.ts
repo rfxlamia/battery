@@ -63,7 +63,7 @@ describe('auth lifecycle parity', () => {
       JSON.stringify({
         accessToken: 'expired-token',
         refreshToken: 'rt-valid',
-        expiresAt: new Date(now + 2 * 3600 * 1000).toISOString(),
+        expiresAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
       }),
       { mode: 0o600 },
     );
@@ -114,7 +114,7 @@ describe('auth lifecycle parity', () => {
       join(homeDir, '.battery', 'tokens', 'acct-1.json'),
       JSON.stringify({
         accessToken: 'bad-token',
-        expiresAt: new Date(now + 2 * 3600 * 1000).toISOString(),
+        expiresAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
       }),
       { mode: 0o600 },
     );
@@ -144,7 +144,7 @@ describe('auth lifecycle parity', () => {
       JSON.stringify({
         accessToken: 'about-to-expire',
         refreshToken: 'rt-valid',
-        expiresAt: new Date(now + 60 * 1000).toISOString(), // expires in 60s — within 300s buffer
+        expiresAt: new Date(Date.now() + 60 * 1000).toISOString(), // expires in 60s — within 300s buffer
       }),
       { mode: 0o600 },
     );
