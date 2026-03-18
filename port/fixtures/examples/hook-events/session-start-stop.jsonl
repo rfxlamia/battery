@@ -1,0 +1,4 @@
+{"event":"SessionStart","timestamp":"2026-03-17T08:00:00Z","sessionId":"abc123"}
+{"event":"PostToolUse","timestamp":"2026-03-17T08:01:00Z","sessionId":"abc123","tool":"Read"}
+{"event":"PostToolUse","timestamp":"2026-03-17T08:04:30Z","sessionId":"abc123","tool":"Write"}
+{"event":"SessionEnd","timestamp":"2026-03-17T08:10:00Z","sessionId":"abc123"}
