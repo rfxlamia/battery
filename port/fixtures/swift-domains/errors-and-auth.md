@@ -26,7 +26,8 @@ The Swift app uses **OAuth 2.0 with PKCE** (Proof Key for Code Exchange):
 ### Local server safety
 
 - Listener auto-stops after **300 seconds** (5 minutes) to prevent leaked listeners.
-- Only the first valid `code` query parameter is processed; subsequent requests get `"Waiting for auth..."`.
+- After the first valid callback with a `code` parameter, `onCode(code)` is called and the accept loop exits entirely (`return`). No further requests are processed.
+- Requests that arrive while the loop is running but do not match the callback path (no `code` parameter) receive `"Waiting for auth..."` and the loop continues.
 
 ### Allowed Linux differences
 
@@ -89,9 +90,12 @@ Called by `UsagePollingService.retryWithForceRefresh()` when a 401 is received.
 ### Rate limit behavior in `UsagePollingService`
 
 - On 429: increment `consecutiveRateLimits`; do NOT overwrite `lastError` if `latestUsage` already exists (cached data preserved).
-- Backoff: `effectiveInterval = min(baseBackoffInterval * 2^(consecutiveRateLimits - 1), maxBackoffInterval)`
+- Backoff formula (only active when `consecutiveRateLimits > 0`):
+  `effectiveInterval = min(baseBackoffInterval * 2^(consecutiveRateLimits - 1), maxBackoffInterval)`
   where `baseBackoffInterval = 60s` and `maxBackoffInterval = 600s`.
-- On success: `consecutiveRateLimits` resets to 0.
+  First rate limit → 60s; second → 120s; third → 240s; fourth → 480s; fifth+ → capped at 600s.
+- When `consecutiveRateLimits == 0`: returns `currentInterval` (the normal session-active or session-idle polling interval, not 60s).
+- On success: `consecutiveRateLimits` resets to 0, polling returns to `currentInterval`.
 
 ### 401 retry sequence
 
@@ -102,7 +106,9 @@ Called by `UsagePollingService.retryWithForceRefresh()` when a 401 is received.
 
 ### Timeout
 
-API requests have a 15-second timeout (`request.timeoutInterval = 15`).
+Usage API requests (`AnthropicAPI.fetchUsage`) have a 15-second timeout (`request.timeoutInterval = 15`).
+
+Token exchange and refresh requests (`OAuthService`, `TokenRefreshService`) do **not** set a custom timeout — they use `URLSession`'s default of 60 seconds.
 
 ---
 

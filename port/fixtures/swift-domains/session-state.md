@@ -15,7 +15,8 @@ The watcher processes events from `~/.battery/events.jsonl` (append-only JSONL f
 | `PostToolUse` | If session not active, activates it (uses existing `currentSessionStart` or event timestamp); resets idle timer |
 | `stop` | Same as `PostToolUse` |
 
-All events update `lastActivity = Date()` (wall clock, not event timestamp).
+Runtime events update `lastActivity = Date()` (wall clock, not event timestamp).
+**Exception — startup recovery:** `parseRecentEvents()` sets `lastActivity` to the event's recorded `timestamp` field, not `Date()`. This means the idle countdown on launch is computed from when the event was written, not from when the app started. A session active 4 minutes ago will idle out after 1 more minute, not 5.
 
 ---
 
