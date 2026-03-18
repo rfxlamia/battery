@@ -9,6 +9,7 @@
   "scripts": {
     "test": "vitest run",
     "test:contracts": "vitest run test/contracts",
+    "test:compat": "vitest run test/compat",
     "test:watch": "vitest",
     "build": "tsc",
     "start": "node dist/main.js"
