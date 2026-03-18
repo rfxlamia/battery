@@ -36,3 +36,4 @@ dist/
 
 # Worktrees
 .worktrees/
+docs/plans/done/

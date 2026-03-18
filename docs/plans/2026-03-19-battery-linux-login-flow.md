@@ -143,10 +143,16 @@ Do not keep a launcher that hardcodes `--loop`; the extension needs a reusable l
 
 **Step 6: Update the installer smoke test**
 
-Extend `/home/v/project/battery/port/core/test/install/install-local.test.ts` so it asserts:
+Replace ALL occurrences of `run-battery-core.sh` in `port/core/test/install/install-local.test.ts` with `battery-core.sh`. The existing test has three references that must change:
 
-- `battery-core.sh` is created
-- the systemd unit uses `battery-core.sh --loop`
+- the hardcoded launcher path in the smoke test (the `launcherPath` variable)
+- the `expect(unit).toContain(...)` assertion for `ExecStart`
+- the static unit-path assertion in the "ships a systemd unit" test
+
+After updating those, the test must assert:
+
+- `battery-core.sh` is created (not `run-battery-core.sh`)
+- the systemd unit uses `ExecStart=%h/.local/share/battery/core/battery-core.sh --loop`
 - the logged `npm` and `systemctl` invocations still match exactly
 
 **Step 7: Run the tests**
@@ -200,6 +206,7 @@ describe('createPkcePair', () => {
 ```ts
 import { describe, expect, it } from 'vitest';
 import { buildAuthorizeUrl } from '../../src/auth/oauth-authorize.js';
+import { OAUTH_AUTHORIZE_URL, OAUTH_CLIENT_ID, OAUTH_SCOPES } from '../../src/config/env.js';
 
 describe('buildAuthorizeUrl', () => {
   it('matches the Swift authorize query shape', () => {
@@ -209,11 +216,11 @@ describe('buildAuthorizeUrl', () => {
       codeChallenge: 'challenge-123',
     }));
 
-    expect(url.origin + url.pathname).toBe('https://claude.ai/oauth/authorize');
-    expect(url.searchParams.get('client_id')).toBe('9d1c250a-e61b-44d9-88ed-5944d1962f5e');
+    expect(url.origin + url.pathname).toBe(OAUTH_AUTHORIZE_URL);
+    expect(url.searchParams.get('client_id')).toBe(OAUTH_CLIENT_ID);
     expect(url.searchParams.get('redirect_uri')).toBe('http://localhost:43123/callback');
     expect(url.searchParams.get('response_type')).toBe('code');
-    expect(url.searchParams.get('scope')).toBe('user:profile user:inference');
+    expect(url.searchParams.get('scope')).toBe(OAUTH_SCOPES);
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
   });
 });
@@ -247,7 +254,7 @@ Match Swift behavior in `/home/v/project/battery/Sources/Services/OAuthService.s
 - authorize URL = `https://claude.ai/oauth/authorize`
 - browser opener = `xdg-open`
 
-Add missing config constants only if they do not already exist.
+Add `OAUTH_AUTHORIZE_URL` to `port/core/src/config/env.ts` following the existing constant pattern — `OAUTH_CLIENT_ID`, `OAUTH_SCOPES`, and `OAUTH_TOKEN_URL` already live there. Do not hardcode the URL inside `oauth-authorize.ts`; import it from `env.ts`.
 
 **Step 5: Run the auth helper tests**
 
@@ -297,6 +304,7 @@ describe('startOAuthListener', () => {
 ```ts
 import { describe, expect, it } from 'vitest';
 import { exchangeCodeForTokens } from '../../src/auth/oauth-login.js';
+import { OAUTH_CLIENT_ID, OAUTH_TOKEN_URL } from '../../src/config/env.js';
 
 describe('exchangeCodeForTokens', () => {
   it('posts the Swift-parity authorization_code body', async () => {
@@ -318,11 +326,11 @@ describe('exchangeCodeForTokens', () => {
       fetchImpl: fetchStub as typeof fetch,
     });
 
-    expect(calls[0]?.url).toBe('https://platform.claude.com/v1/oauth/token');
+    expect(calls[0]?.url).toBe(OAUTH_TOKEN_URL);
     expect(calls[0]?.body).toMatchObject({
       grant_type: 'authorization_code',
       code: 'code-123',
-      client_id: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
+      client_id: OAUTH_CLIENT_ID,
       code_verifier: 'verifier-123',
       redirect_uri: 'http://localhost:43123/callback',
       state: 'state-123',
@@ -446,6 +454,8 @@ Add readonly-safe write helpers:
 - `readAllAccounts(homeDir)`
 - `writeAccounts(homeDir, accounts)`
 - `writeSelectedAccountId(homeDir, accountId)`
+
+Also **export** `readPersistedSelectedAccountId(homeDir)` — it currently exists in `account-store.ts` but is private. `persistLoginResult` in `login-persistence.ts` needs it to determine whether to replace tokens for the existing selected account or create a new one. Export it so the write path can import it without duplicating the logic.
 
 Write Swift-compatible account records, not a new ad-hoc Linux schema:
 
@@ -581,7 +591,7 @@ if (command.kind === 'login') {
 }
 ```
 
-Do not break the current `--loop` service path.
+Inside `runLoginCommand`, when calling the real `pollOnce` (not the injected stub), pass `now: Date.now()` — the function signature requires `{fetchImpl, now, homeDir}`. Do not break the current `--loop` service path.
 
 **Step 4: Add a manual command verification note to the test**
 
@@ -641,6 +651,8 @@ describe('getBatteryCoreLauncherPath', () => {
 
 **Step 2: Write the failing popup action test**
 
+`buildPopupRows` already returns rows with `loginRequired: true` for `login_required` state and the existing test covers this. Extend it with one additional assertion to verify the row message is present:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { buildPopupRows } from '../lib/popup-view.js';
@@ -653,14 +665,7 @@ describe('buildPopupRows', () => {
 });
 ```
 
-Then add a new pure helper for actions if needed:
-
-```ts
-expect(getPrimaryAction({ status: 'login_required' })).toEqual({
-  kind: 'login',
-  label: 'Sign in',
-});
-```
+Do not add a separate `getPrimaryAction` helper — `buildPopupRows` already carries what's needed to decide which action to show in the extension.
 
 **Step 3: Implement the launcher helper**
 
@@ -685,11 +690,9 @@ Keep the core command path in one place, not duplicated inside `extension.js`.
 
 In `/home/v/project/battery/port/gnome-extension/extension.js`:
 
-- when state is `login_required`, show a real action:
-  - `Sign in`
+- when state is `login_required`, add a real clickable `Sign in` action using `menu.addAction('Sign in', ...)` — the same API already used for `Reload state`. Do **not** use `PopupMenuItem` with `sensitive = false` for this; that path is for read-only informational rows and the click will be swallowed.
 - keep `Reload state`
-- clicking `Sign in` should launch the installed core login command
-- after launch, call `_refresh()` so the extension can re-read state on the next interval
+- the `Sign in` callback should launch `getBatteryCoreLoginCommand(homeDir)` via `Gio.Subprocess`, then call `this._refresh()` so the extension can re-read state on the next poll interval
 
 Do not move OAuth logic into the extension.
 
