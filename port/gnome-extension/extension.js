@@ -16,7 +16,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { getIndicatorLabel } from './lib/status-model.js';
 import { parseStateJson } from './lib/state-reader.js';
 import { buildPopupRows } from './lib/popup-view.js';
-import { getLocalStateStatusForReadError } from './lib/read-error-status.js';
+import { getLocalStateStatusForReadFailure } from './lib/read-error-status.js';
 
 const REFRESH_INTERVAL_SECONDS = 30;
 
@@ -61,11 +61,13 @@ class BatteryIndicator extends PanelMenu.Button {
     try {
       const file = Gio.File.new_for_path(this._stateFile);
       const [ok, contents] = file.load_contents(null);
-      if (!ok) return { _localStateStatus: 'missing' };
+      if (!ok) {
+        return { _localStateStatus: getLocalStateStatusForReadFailure({ ok: false, gioApi: Gio }) };
+      }
       const rawJson = new TextDecoder().decode(contents);
       return parseStateJson(rawJson) ?? { _localStateStatus: 'invalid' };
     } catch (error) {
-      return { _localStateStatus: getLocalStateStatusForReadError(error, Gio) };
+      return { _localStateStatus: getLocalStateStatusForReadFailure({ error, gioApi: Gio }) };
     }
   }
 
