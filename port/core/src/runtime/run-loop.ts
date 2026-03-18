@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { pollOnceWithMeta } from './poll-once.js';
 import type { BatteryState } from '../contracts/index.js';
+import type { PollOutcome } from './poll-once.js';
 
 const POLL_INTERVAL_ACTIVE_MS = 60_000;
 const POLL_INTERVAL_IDLE_MS = 300_000;
@@ -14,6 +15,17 @@ interface TickDeps {
   fetchImpl: typeof fetch;
   now: number;
   homeDir: string;
+}
+
+export interface RunLoopState {
+  currentInterval: number;
+  consecutiveErrors: number;
+  consecutiveRateLimits: number;
+}
+
+interface StepDeps extends TickDeps {
+  pollOnceWithMetaImpl?: (deps: TickDeps) => Promise<PollOutcome>;
+  logError?: (message: string, error: unknown) => void;
 }
 
 /**
@@ -34,6 +46,14 @@ export function getNextPollingInterval(
 ): number {
   if (sessionActive === undefined) return currentInterval;
   return getPollingIntervalMs(sessionActive);
+}
+
+export function createInitialRunLoopState(): RunLoopState {
+  return {
+    currentInterval: POLL_INTERVAL_ACTIVE_MS,
+    consecutiveErrors: 0,
+    consecutiveRateLimits: 0,
+  };
 }
 
 export function getEffectiveInterval(
@@ -58,33 +78,51 @@ export function getServiceCommand(): string {
   return `node ${mainPath}`;
 }
 
+export async function runLoopStep(
+  loopState: RunLoopState,
+  deps: StepDeps,
+): Promise<{ loopState: RunLoopState; sleepMs: number }> {
+  const pollImpl = deps.pollOnceWithMetaImpl ?? pollOnceWithMeta;
+  const logError = deps.logError ?? ((message: string, error: unknown) => console.error(message, error));
+  let nextLoopState = loopState;
+  let retryAfterSeconds;
+
+  try {
+    const { rateLimited, retryAfterSeconds: nextRetryAfterSeconds, sessionActive } = await pollImpl(deps);
+    nextLoopState = {
+      currentInterval: getNextPollingInterval(loopState.currentInterval, sessionActive),
+      consecutiveErrors: 0,
+      consecutiveRateLimits: rateLimited ? loopState.consecutiveRateLimits + 1 : 0,
+    };
+    retryAfterSeconds = nextRetryAfterSeconds;
+  } catch (err) {
+    const consecutiveErrors = loopState.consecutiveErrors + 1;
+    nextLoopState = { ...loopState, consecutiveErrors };
+    logError(`Battery core poll error (${consecutiveErrors}):`, err);
+  }
+
+  return {
+    loopState: nextLoopState,
+    sleepMs: getEffectiveInterval(
+      nextLoopState.currentInterval,
+      nextLoopState.consecutiveRateLimits,
+      retryAfterSeconds,
+    ),
+  };
+}
+
 /**
  * Long-running loop for systemd --user service.
  * Polls on an interval that adapts to session activity.
  */
 export async function runLoop(homeDir: string): Promise<never> {
-  let consecutiveErrors = 0;
-  let consecutiveRateLimits = 0;
-  let currentInterval = POLL_INTERVAL_IDLE_MS;
+  let loopState = createInitialRunLoopState();
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
-    let retryAfterSeconds;
-    try {
-      const now = Date.now();
-      const { rateLimited, retryAfterSeconds: nextRetryAfterSeconds, sessionActive } =
-        await pollOnceWithMeta({ fetchImpl: fetch, now, homeDir });
-      consecutiveErrors = 0;
-      currentInterval = getNextPollingInterval(currentInterval, sessionActive);
-      consecutiveRateLimits = rateLimited ? consecutiveRateLimits + 1 : 0;
-      retryAfterSeconds = nextRetryAfterSeconds;
-    } catch (err) {
-      consecutiveErrors += 1;
-      console.error(`Battery core poll error (${consecutiveErrors}):`, err);
-    }
-
-    const intervalMs = getEffectiveInterval(currentInterval, consecutiveRateLimits, retryAfterSeconds);
-    await sleep(intervalMs);
+    const step = await runLoopStep(loopState, { fetchImpl: fetch, now: Date.now(), homeDir });
+    loopState = step.loopState;
+    await sleep(step.sleepMs);
   }
 }
 

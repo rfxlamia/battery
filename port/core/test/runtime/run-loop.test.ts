@@ -3,10 +3,12 @@ import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  createInitialRunLoopState,
   getEffectiveInterval,
   getNextPollingInterval,
   getPollingIntervalMs,
   getServiceCommand,
+  runLoopStep,
   runLoopTick,
 } from '../../src/runtime/run-loop.js';
 
@@ -58,6 +60,49 @@ describe('getNextPollingInterval', () => {
   it('updates the interval when session activity is available', () => {
     expect(getNextPollingInterval(300_000, true)).toBe(60_000);
     expect(getNextPollingInterval(60_000, false)).toBe(300_000);
+  });
+});
+
+describe('createInitialRunLoopState', () => {
+  it('starts from the Swift-compatible 60 second polling interval', () => {
+    expect(createInitialRunLoopState().currentInterval).toBe(60_000);
+  });
+});
+
+describe('runLoopStep', () => {
+  it('keeps the last active interval when a later poll iteration throws', async () => {
+    let callCount = 0;
+    const errors: string[] = [];
+    const pollImpl = async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return {
+          state: { status: 'ok' },
+          rateLimited: false,
+          sessionActive: true,
+        } as never;
+      }
+      throw new Error('boom');
+    };
+
+    const firstStep = await runLoopStep(createInitialRunLoopState(), {
+      fetchImpl: fetch,
+      now: Date.now(),
+      homeDir: '/tmp/battery-run-loop-test',
+      pollOnceWithMetaImpl: pollImpl,
+      logError: (message) => errors.push(message),
+    });
+    const secondStep = await runLoopStep(firstStep.loopState, {
+      fetchImpl: fetch,
+      now: Date.now(),
+      homeDir: '/tmp/battery-run-loop-test',
+      pollOnceWithMetaImpl: pollImpl,
+      logError: (message) => errors.push(message),
+    });
+
+    expect(firstStep.sleepMs).toBe(60_000);
+    expect(secondStep.sleepMs).toBe(60_000);
+    expect(errors).toContain('Battery core poll error (1):');
   });
 });
 

@@ -30,6 +30,8 @@ describe('local installer paths', () => {
     const fakeBinDir = join(sandboxDir, 'bin');
     const fakeDistDir = join(fakeCoreDir, 'dist');
     const fakeSystemdDir = join(fakeCoreDir, 'systemd');
+    const npmLogPath = join(sandboxDir, 'npm.log');
+    const systemctlLogPath = join(sandboxDir, 'systemctl.log');
 
     await mkdir(fakeHome, { recursive: true });
     await mkdir(fakeBinDir, { recursive: true });
@@ -48,12 +50,12 @@ describe('local installer paths', () => {
     const systemctlStub = join(fakeBinDir, 'systemctl');
     await writeFile(
       npmStub,
-      '#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n',
+      '#!/usr/bin/env bash\nset -euo pipefail\nprintf "%s\\n" "$*" >> "$BATTERY_TEST_NPM_LOG"\nexit 0\n',
       { mode: 0o755 },
     );
     await writeFile(
       systemctlStub,
-      '#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n',
+      '#!/usr/bin/env bash\nset -euo pipefail\nprintf "%s\\n" "$*" >> "$BATTERY_TEST_SYSTEMCTL_LOG"\nexit 0\n',
       { mode: 0o755 },
     );
     await chmod(npmStub, 0o755);
@@ -63,6 +65,8 @@ describe('local installer paths', () => {
       cwd: fakeCoreDir,
       env: {
         ...process.env,
+        BATTERY_TEST_NPM_LOG: npmLogPath,
+        BATTERY_TEST_SYSTEMCTL_LOG: systemctlLogPath,
         HOME: fakeHome,
         PATH: `${fakeBinDir}:${process.env['PATH'] ?? ''}`,
       },
@@ -72,8 +76,15 @@ describe('local installer paths', () => {
     const unitPath = join(fakeHome, '.config', 'systemd', 'user', 'battery-core.service');
     const launcher = await readFile(launcherPath, 'utf8');
     const unit = await readFile(unitPath, 'utf8');
+    const npmLog = await readFile(npmLogPath, 'utf8');
+    const systemctlLog = await readFile(systemctlLogPath, 'utf8');
 
     expect(launcher).toContain('dist/main.js');
     expect(unit).toContain('ExecStart=%h/.local/share/battery/core/run-battery-core.sh');
+    expect(npmLog).toContain('ci');
+    expect(npmLog).toContain('run build');
+    expect(npmLog).toContain('ci --omit=dev --prefix');
+    expect(systemctlLog).toContain('--user daemon-reload');
+    expect(systemctlLog).toContain('--user enable --now battery-core.service');
   });
 });
