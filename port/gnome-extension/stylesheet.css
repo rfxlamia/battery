@@ -63,3 +63,11 @@
 .battery-error-notice {
   color: #ef5350;
 }
+
+/* ── Panel icon ───────────────────────────────────────── */
+
+.battery-panel-icon {
+  width: 24px;
+  height: 10px;
+  margin-right: 3px;
+}

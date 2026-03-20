@@ -40,6 +40,15 @@ const BatteryIndicator = GObject.registerClass(class BatteryIndicator extends Pa
 
     this._extension = extension;
     this._stateFile = GLib.get_home_dir() + '/.battery/state.json';
+    this._lastState = null;
+
+    // Mini progress bar icon (matching Swift's MenuBarIconView progress bar)
+    this._progressIcon = new St.DrawingArea({
+      style_class: 'battery-panel-icon',
+      y_align: Clutter.ActorAlign.CENTER,
+    });
+    this._progressIcon.connect('repaint', () => this._repaintPanelIcon());
+    this.add_child(this._progressIcon);
 
     this._label = new St.Label({
       text: 'Battery …',
@@ -75,6 +84,8 @@ const BatteryIndicator = GObject.registerClass(class BatteryIndicator extends Pa
 
   _refresh() {
     const state = this._readState();
+    this._lastState = state;
+    this._progressIcon.queue_repaint();
     this._label.set_text(getIndicatorLabel(state));
     this.menu.removeAll();
     _buildPopupContent(this.menu, state);
@@ -92,6 +103,62 @@ const BatteryIndicator = GObject.registerClass(class BatteryIndicator extends Pa
       });
     }
     this.menu.addAction('Reload state', () => this._refresh());
+  }
+
+  /**
+   * Repaints the panel progress bar icon using Cairo.
+   * Mirrors Swift's makeProgressBarImage: a rounded-rect border with a filled arc.
+   */
+  _repaintPanelIcon() {
+    const cr = this._progressIcon.get_context();
+    const [w, h] = this._progressIcon.get_surface_size();
+
+    if (w === 0 || h === 0) {
+      cr.$dispose();
+      return;
+    }
+
+    const state = this._lastState;
+    const isOk = state?.status === 'ok' && !state?._localStateStatus;
+    const utilization = isOk && state.session
+      ? Math.min(Math.max(state.session.utilization, 0), 1)
+      : 0;
+    const level = isOk ? utilizationColorLevel(utilization) : 'green';
+
+    const lineWidth = 1.5;
+    const borderR = 3;
+    const inset = 2;
+
+    // Border (white, theme-adaptive via opacity)
+    cr.setSourceRGBA(1, 1, 1, 0.85);
+    cr.setLineWidth(lineWidth);
+    _drawRoundedRect(
+      cr,
+      lineWidth / 2,
+      lineWidth / 2,
+      w - lineWidth,
+      h - lineWidth,
+      borderR
+    );
+    cr.stroke();
+
+    // Fill
+    if (utilization > 0) {
+      const ix = lineWidth / 2 + inset;
+      const iy = lineWidth / 2 + inset;
+      const iw = w - lineWidth - 2 * inset;
+      const ih = h - lineWidth - 2 * inset;
+      const fillW = iw * utilization;
+
+      if (fillW > 0) {
+        const [fr, fg, fb] = _rgbForLevel(level);
+        cr.setSourceRGBA(fr, fg, fb, 1.0);
+        _drawRoundedRect(cr, ix, iy, fillW, ih, Math.max(0, borderR - inset));
+        cr.fill();
+      }
+    }
+
+    cr.$dispose();
   }
 
   destroy() {
