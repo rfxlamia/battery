@@ -8,6 +8,8 @@
   font-size: 0.9em;
 }
 
+/* ── Popup row styles ─────────────────────────────────── */
+
 .battery-popup-row {
   padding: 4px 8px;
 }
@@ -20,6 +22,38 @@
 .battery-popup-value {
   font-weight: bold;
 }
+
+/* Key/value rows: dimmed label */
+.battery-row-label {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85em;
+}
+
+/* Key/value rows: bold value (default color) */
+.battery-row-value {
+  font-weight: bold;
+  font-size: 0.9em;
+}
+
+/* Progress rows: spacing above/below the bar */
+.battery-progress-row {
+  padding-bottom: 2px;
+}
+
+/* Cairo gauge area height — width is set by x_expand */
+.battery-gauge-area {
+  height: 6px;
+  margin-top: 3px;
+}
+
+/* ── Color-coded values (mirror Swift UsageLevel) ─────── */
+
+.battery-value-green  { color: #4caf50; }
+.battery-value-yellow { color: #ffc107; }
+.battery-value-orange { color: #ff9800; }
+.battery-value-red    { color: #ef5350; }
+
+/* ── Status message styles ────────────────────────────── */
 
 .battery-stale-notice {
   color: #f9a825;
