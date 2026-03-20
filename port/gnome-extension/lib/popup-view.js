@@ -14,11 +14,29 @@ const PLAN_TIER_DISPLAY = {
   unknown: 'Unknown',
 };
 
+/** Pattern matching generic auto-generated account names like "Account 1", "Account 42". */
+const GENERIC_ACCOUNT_RE = /^Account \d+$/;
+
+/**
+ * Maps a 0-1 utilization fraction to a color level string.
+ * Thresholds mirror Swift's UsageLevel: low<0.5, moderate<0.75, high<0.9, critical>=0.9.
+ *
+ * @param {number} utilization - 0.0 to 1.0
+ * @returns {'green'|'yellow'|'orange'|'red'}
+ */
+export function utilizationColorLevel(utilization) {
+  if (utilization >= 0.9) return 'red';
+  if (utilization >= 0.75) return 'orange';
+  if (utilization >= 0.5) return 'yellow';
+  return 'green';
+}
+
 /**
  * Row types:
- *   { label: string, value: string }              — key/value data row
- *   { message: string, stale?: true, error?: true, loginRequired?: true }
- *                                                  — status message row
+ *   { label, value }                          — plain key/value row
+ *   { label, value, utilization, colorLevel, isProgressRow: true }
+ *                                             — gauge row (progress bar + value)
+ *   { message, stale?, error?, loginRequired? } — status message row
  */
 
 /**
@@ -26,7 +44,7 @@ const PLAN_TIER_DISPLAY = {
  *
  * @param {object|null} state
  * @param {Date} [now]
- * @returns {Array<{label?: string, value?: string, message?: string, stale?: boolean, error?: boolean, loginRequired?: boolean}>}
+ * @returns {Array}
  */
 export function buildPopupRows(state, now = new Date()) {
   if (state?._localStateStatus === 'missing') {
@@ -64,18 +82,30 @@ export function buildPopupRows(state, now = new Date()) {
       rows.push({ message: 'Data is stale — core service may not be running', stale: true });
     }
 
+    // Account and plan — only shown when non-generic / non-unknown
     if (state.account) {
-      rows.push({ label: 'Account', value: state.account.name });
-      rows.push({
-        label: 'Plan',
-        value: PLAN_TIER_DISPLAY[state.account.planTier] ?? state.account.planTier,
-      });
+      if (!GENERIC_ACCOUNT_RE.test(state.account.name)) {
+        rows.push({ label: 'Account', value: state.account.name });
+      }
+      if (state.account.planTier !== 'unknown') {
+        rows.push({
+          label: 'Plan',
+          value: PLAN_TIER_DISPLAY[state.account.planTier] ?? state.account.planTier,
+        });
+      }
     }
 
+    // Session — progress row with utilization for gauge rendering
     if (state.session) {
-      const sessionPct = `${Math.round(state.session.utilization * 100)}%`;
-      const sessionActive = state.session.isActive ? ' (active)' : ' (idle)';
-      rows.push({ label: 'Session', value: sessionPct + sessionActive });
+      const pct = Math.round(state.session.utilization * 100);
+      const active = state.session.isActive ? ' (active)' : ' (idle)';
+      rows.push({
+        label: 'Session',
+        value: `${pct}%${active}`,
+        utilization: state.session.utilization,
+        colorLevel: utilizationColorLevel(state.session.utilization),
+        isProgressRow: true,
+      });
 
       const resetText = formatResetTime(state.session.resetsAt, now);
       if (resetText) {
@@ -83,9 +113,16 @@ export function buildPopupRows(state, now = new Date()) {
       }
     }
 
+    // Weekly — progress row with utilization for gauge rendering
     if (state.weekly) {
-      const weeklyPct = `${Math.round(state.weekly.utilization * 100)}%`;
-      rows.push({ label: 'Weekly', value: weeklyPct });
+      const pct = Math.round(state.weekly.utilization * 100);
+      rows.push({
+        label: 'Weekly',
+        value: `${pct}%`,
+        utilization: state.weekly.utilization,
+        colorLevel: utilizationColorLevel(state.weekly.utilization),
+        isProgressRow: true,
+      });
 
       const weeklyReset = formatResetTime(state.weekly.resetsAt, now);
       if (weeklyReset) {
