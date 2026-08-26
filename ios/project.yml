@@ -1,0 +1,122 @@
+# XcodeGen spec — turns the loose ios/ Swift files into a runnable Xcode project.
+#   brew install xcodegen   (already installed here)
+#   cd ios && xcodegen generate && open Battery.xcodeproj
+#
+# Two targets: the app, and the widget/Live-Activity extension it embeds.
+# The shared BatteryKit/ folder is compiled into BOTH.
+
+name: Battery
+options:
+  bundleIdPrefix: com.allthingsclaude.battery.ios
+  deploymentTarget:
+    iOS: "16.2"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    # CI overrides both on the xcodebuild command line, driven by the release
+    # tag; these are only the defaults for a local build. The Info.plists below
+    # must reference them via $(...) for an override to reach the bundle.
+    MARKETING_VERSION: "0.1.6"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    CODE_SIGN_STYLE: Automatic
+    GENERATE_INFOPLIST_FILE: "NO"      # XcodeGen writes the Info.plists below
+    DEVELOPMENT_TEAM: "746889X99S"     # applied to both targets; survives regeneration
+
+targets:
+  # ---------- App ----------
+  Battery:
+    type: application
+    platform: iOS
+    sources:
+      - BatteryApp
+      - BatteryKit
+    dependencies:
+      - target: BatteryWidgets            # embeds the extension automatically
+    # Emit a shared "Battery" scheme so it always shows in Xcode's scheme picker
+    # and is the one you Run (the widget/Live Activity ride inside the app).
+    scheme:
+      testTargets: []
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.allthingsclaude.battery.ios
+        CODE_SIGN_ENTITLEMENTS: config/BatteryApp.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # iPhone only — Live Activities and the Dynamic Island don't exist on
+        # iPad, so shipping there would mean an App Store reviewer testing the
+        # product's whole premise on a device that can't show it. This has to
+        # live on the target: XcodeGen writes its own "1,2" default at target
+        # level, which outranks anything set in the project-wide block above.
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: Generated/Battery-Info.plist
+      properties:
+        CFBundleDisplayName: Battery
+        # XcodeGen otherwise hardcodes 1.0 / 1 here, which silently ignores the
+        # version CI passes on the command line — every TestFlight upload would
+        # claim to be 1.0 (1) and the second one would bounce as a duplicate.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # We use no non-exempt encryption (HTTPS only). Without this key every
+        # upload parks in "Missing Compliance" until answered by hand, which
+        # would block an automated TestFlight release.
+        ITSAppUsesNonExemptEncryption: false
+        # Alternate Home Screen icons (Settings ▸ Appearance ▸ App Icon). Only
+        # the dark artwork is registered: the light one is the target's primary
+        # icon from the asset catalog, so selecting it clears the alternate.
+        # These have to be loose PNGs in the bundle root — iOS won't read an
+        # alternate icon out of an asset catalog — hence BatteryApp/
+        # AlternateIcons/, which XcodeGen picks up as flat resources. actool
+        # merges CFBundlePrimaryIcon into this same dict at build time.
+        CFBundleIcons:
+          CFBundleAlternateIcons:
+            AppIcon-Dark:
+              CFBundleIconFiles: [AppIcon-Dark]
+              UIPrerenderedIcon: false
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
+        # remote-notification lets the relay's silent push wake us long enough to
+        # refresh the App Group snapshot and reload the widgets.
+        UIBackgroundModes: [fetch, processing, remote-notification]
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.allthingsclaude.battery.ios.refresh
+        # Brand typefaces (see BatteryKit/BatteryFont.swift). Both targets
+        # register them: an extension is a separate bundle, so the app's
+        # registration does not carry over to the widgets or Live Activity.
+        UIAppFonts:
+          - Inter-Regular.ttf
+          - Inter-SemiBold.ttf
+          - SpaceGrotesk-Bold.ttf
+          - JetBrainsMono-Regular.ttf
+          - JetBrainsMono-SemiBold.ttf
+        UILaunchScreen: {}
+
+  # ---------- Widget + Live Activity extension ----------
+  BatteryWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - BatteryWidgets
+      - BatteryKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.allthingsclaude.battery.ios.widgets
+        CODE_SIGN_ENTITLEMENTS: config/BatteryWidgets.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: Generated/BatteryWidgets-Info.plist
+      properties:
+        CFBundleDisplayName: Battery
+        # Must track the host app exactly — App Store Connect rejects a bundle
+        # whose embedded extension carries a different version.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIAppFonts:
+          - Inter-Regular.ttf
+          - Inter-SemiBold.ttf
+          - SpaceGrotesk-Bold.ttf
+          - JetBrainsMono-Regular.ttf
+          - JetBrainsMono-SemiBold.ttf
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension

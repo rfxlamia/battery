@@ -130,7 +130,44 @@ class AccountManager: ObservableObject {
         tokensDir.appendingPathComponent("\(accountId.uuidString).json")
     }
 
+    /// What a token lookup found, so callers can tell a missing credential from
+    /// one that is merely unreadable right now.
+    enum TokenLookup {
+        case tokens(StoredTokens)
+        /// No credential anywhere. Signing in is the only cure.
+        case missing
+        /// The account is mapped to a Claude Code config dir whose credential
+        /// could not be read — a denied keychain prompt, a renamed directory,
+        /// Claude Code signed out. Transient by nature.
+        case liveUnavailable
+    }
+
+    /// Resolve tokens, keeping mapped accounts out of the sign-in path.
+    ///
+    /// A mapped account **never** falls through to Battery's own store. It used
+    /// to: any failure to read the live credential — including clicking Deny
+    /// once on the keychain prompt — returned nil, which surfaced as "needs
+    /// reauth", opened a browser, and minted a second refresh chain for an
+    /// account that already had a working one. That is exactly the stranding
+    /// the live-credentials bridge exists to prevent, reached by the most
+    /// ordinary user action available.
+    func tokenLookup(for accountId: UUID) -> TokenLookup {
+        if LiveCredentials.isMapped(accountId) {
+            guard let live = LiveCredentials.tokens(for: accountId) else {
+                return .liveUnavailable
+            }
+            return .tokens(live)
+        }
+        guard let stored = storedTokens(for: accountId) else { return .missing }
+        return .tokens(stored)
+    }
+
     func getTokens(for accountId: UUID) -> StoredTokens? {
+        if case .tokens(let t) = tokenLookup(for: accountId) { return t }
+        return nil
+    }
+
+    private func storedTokens(for accountId: UUID) -> StoredTokens? {
         // 1. File-based storage (primary)
         let file = tokenFile(for: accountId)
         if fileManager.fileExists(atPath: file.path) {
@@ -164,15 +201,21 @@ class AccountManager: ObservableObject {
         }
     }
 
-    func saveTokens(_ tokens: StoredTokens, for accountId: UUID) {
+    /// - Returns: whether the tokens reached disk. Callers holding a rotated
+    ///   refresh token must not discard it on `false`: the old one is already
+    ///   spent server-side, so a silently dropped write strands the account.
+    @discardableResult
+    func saveTokens(_ tokens: StoredTokens, for accountId: UUID) -> Bool {
         do {
             try fileManager.createDirectory(at: tokensDir, withIntermediateDirectories: true)
             try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: tokensDir.path)
             let data = try JSONEncoder().encode(tokens)
             try data.write(to: tokenFile(for: accountId), options: .atomic)
             try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tokenFile(for: accountId).path)
+            return true
         } catch {
             print("Failed to save tokens for \(accountId): \(error.localizedDescription)")
+            return false
         }
     }
 
